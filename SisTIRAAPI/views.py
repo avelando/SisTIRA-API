@@ -1,26 +1,42 @@
-from rest_framework.viewsets import ModelViewSet
-from .models import User, Discipline, QuestionBank, Exam, Room
-from .serializers import (
-    UserSerializer, DisciplineSerializer, QuestionBankSerializer,
-    ExamSerializer, RoomSerializer
-)
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .services.user_services import create_user, get_user_by_id, get_all_users, update_user, delete_user
 
-class UserViewSet(ModelViewSet):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
+class UserView(APIView):
+    def get(self, request, user_id=None):
+        if user_id:
+            try:
+                user = get_user_by_id(user_id)
+                return Response({"id": user.id, "name": user.name, "email": user.email}, status=status.HTTP_200_OK)
+            except ValueError as e:
+                return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            users = get_all_users()
+            data = [{"id": user.id, "name": user.name, "email": user.email} for user in users]
+            return Response(data, status=status.HTTP_200_OK)
 
-class DisciplineViewSet(ModelViewSet):
-    queryset = Discipline.objects.all()
-    serializer_class = DisciplineSerializer
+    def post(self, request):
+        try:
+            user = create_user(name=request.data['name'], email=request.data['email'])
+            return Response({"id": user.id, "name": user.name, "email": user.email}, status=status.HTTP_201_CREATED)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-class QuestionBankViewSet(ModelViewSet):
-    queryset = QuestionBank.objects.all()
-    serializer_class = QuestionBankSerializer
+    def put(self, request, user_id):
+        try:
+            user = update_user(
+                user_id=user_id,
+                name=request.data.get('name'),
+                email=request.data.get('email')
+            )
+            return Response({"id": user.id, "name": user.name, "email": user.email}, status=status.HTTP_200_OK)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-class ExamViewSet(ModelViewSet):
-    queryset = Exam.objects.all()
-    serializer_class = ExamSerializer
-
-class RoomViewSet(ModelViewSet):
-    queryset = Room.objects.all()
-    serializer_class = RoomSerializer
+    def delete(self, request, user_id):
+        try:
+            result = delete_user(user_id)
+            return Response(result, status=status.HTTP_204_NO_CONTENT)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)

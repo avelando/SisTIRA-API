@@ -1,14 +1,7 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import UserViewSet, DisciplineViewSet, QuestionBankViewSet, ExamViewSet, RoomViewSet
-
-router = DefaultRouter()
-router.register(r'users', UserViewSet, basename='user')
-router.register(r'disciplines', DisciplineViewSet, basename='discipline')
-router.register(r'question-banks', QuestionBankViewSet, basename='question-bank')
-router.register(r'exams', ExamViewSet, basename='exam')
-router.register(r'rooms', RoomViewSet, basename='room')
+from django.urls import path
+from .views import UserView
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('users/', UserView.as_view(), name='user-list'),
+    path('users/<int:user_id>/', UserView.as_view(), name='user-detail'),
 ]

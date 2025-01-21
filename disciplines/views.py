@@ -1,3 +1,11 @@
-from django.shortcuts import render
+from rest_framework.viewsets import ModelViewSet
+from .models import AreaOfStudy, Discipline
+from .serializers import AreaOfStudySerializer, DisciplineSerializer
 
-# Create your views here.
+class AreaOfStudyViewSet(ModelViewSet):
+    queryset = AreaOfStudy.objects.all()
+    serializer_class = AreaOfStudySerializer
+
+class DisciplineViewSet(ModelViewSet):
+    queryset = Discipline.objects.all()
+    serializer_class = DisciplineSerializer

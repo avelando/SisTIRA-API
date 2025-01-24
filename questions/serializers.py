@@ -1,46 +1,51 @@
 from rest_framework import serializers
-
+from .models import Question, Alternative
 from disciplines.models import Discipline
-from .models import Question, Source, ResponseType
-from disciplines.serializers import DisciplineSerializer
 
-class ResponseTypeSerializer(serializers.ModelSerializer):
+class AlternativeSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ResponseType
-        fields = ['id', 'name', 'description']
-
-
-class SourceSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Source
-        fields = ['id', 'name']
-
+        model = Alternative
+        fields = ['id', 'content', 'correct']
 
 class QuestionSerializer(serializers.ModelSerializer):
-    response_types = serializers.PrimaryKeyRelatedField(queryset=ResponseType.objects.all(), many=True)
+    alternatives = AlternativeSerializer(many=True, required=False)
     disciplines = serializers.PrimaryKeyRelatedField(queryset=Discipline.objects.all(), many=True)
 
     class Meta:
         model = Question
-        fields = ['id', 'text', 'response_types', 'disciplines', 'created_at', 'creator', 'sources', 'citation']
-        read_only_fields = ['creator']
+        fields = ['id', 'text', 'question_type', 'disciplines', 'alternatives', 'created_at', 'creator']
+        read_only_fields = ['created_at', 'creator']
+
+    def validate(self, data):
+        if data['question_type'] == 'OBJ' and not data.get('alternatives'):
+            raise serializers.ValidationError("Questões objetivas devem ter pelo menos uma alternativa.")
+        if data['question_type'] == 'SUB' and data.get('alternatives'):
+            raise serializers.ValidationError("Questões subjetivas não podem ter alternativas.")
+        return data
 
     def create(self, validated_data):
-        response_types_data = validated_data.pop('response_types', [])
-        disciplines_data = validated_data.pop('disciplines', [])
-        sources_data = validated_data.pop('sources', [])
+        alternatives_data = validated_data.pop('alternatives', [])
+        disciplines = validated_data.pop('disciplines', [])
         question = Question.objects.create(**validated_data)
+        question.disciplines.set(disciplines)
 
-        for response_type_data in response_types_data:
-            response_type, _ = ResponseType.objects.get_or_create(**response_type_data)
-            question.response_types.add(response_type)
-
-        for discipline_data in disciplines_data:
-            discipline, _ = Discipline.objects.get_or_create(**discipline_data)
-            question.disciplines.add(discipline)
-
-        for source_data in sources_data:
-            source, _ = Source.objects.get_or_create(**source_data)
-            question.sources.add(source)
+        for alternative_data in alternatives_data:
+            Alternative.objects.create(question=question, **alternative_data)
 
         return question
+
+    def update(self, instance, validated_data):
+        alternatives_data = validated_data.pop('alternatives', None)
+        disciplines = validated_data.pop('disciplines', [])
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.disciplines.set(disciplines)
+        instance.save()
+
+        if alternatives_data is not None:
+            instance.alternatives.all().delete()
+            for alternative_data in alternatives_data:
+                Alternative.objects.create(question=instance, **alternative_data)
+
+        return instance

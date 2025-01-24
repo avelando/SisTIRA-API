@@ -1,6 +1,6 @@
 from django.db import models
 from disciplines.models import Discipline
-from users.models import User
+from accounts.models import CustomUser as User
 
 class Question(models.Model):
     TYPE_CHOICES = [

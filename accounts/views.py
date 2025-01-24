@@ -10,6 +10,7 @@ from .models import CustomUser
 from .serializers import UserSerializer
 from rest_framework.authtoken.models import Token
 
+
 class UserViewSet(ModelViewSet):
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
@@ -20,17 +21,18 @@ class UserViewSet(ModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        if not self.request.user.is_admin:
-            raise PermissionDenied("Apenas administradores podem listar usuários.")
-        return super().get_queryset()
+        if self.request.user.is_superuser:
+            return CustomUser.objects.all()
+        return CustomUser.objects.filter(id=self.request.user.id)
+
 
     def perform_update(self, serializer):
-        if not self.request.user.is_admin and serializer.instance != self.request.user:
-            raise PermissionDenied("Você só pode editar sua própria conta.")
+        if serializer.instance != self.request.user and not self.request.user.is_superuser:
+            raise PermissionDenied("Você só pode editar seus próprios dados.")
         serializer.save()
 
     def perform_destroy(self, instance):
-        if not self.request.user.is_admin and instance != self.request.user:
+        if instance != self.request.user and not self.request.user.is_superuser:
             raise PermissionDenied("Você só pode excluir sua própria conta.")
         instance.delete()
 
@@ -43,7 +45,7 @@ class LoginView(APIView):
         email = request.data.get('email')
         password = request.data.get('password')
 
-        user = authenticate(request, username=email, password=password)
+        user = authenticate(request, username=request.data.get('email'), password=password)
 
         if user is not None:
             token, created = Token.objects.get_or_create(user=user)

@@ -1,39 +1,18 @@
 from rest_framework import serializers
-from .models import AreaOfStudy, Discipline
+from .models import StudyArea, Discipline
 
-class AreaOfStudySerializer(serializers.ModelSerializer):
+class StudyAreaSerializer(serializers.ModelSerializer):
     class Meta:
-        model = AreaOfStudy
-        fields = ['id', 'name']
+        model = StudyArea
+        fields = ['id', 'name', 'description']
+
 
 class DisciplineSerializer(serializers.ModelSerializer):
-    areas_of_study = AreaOfStudySerializer(many=True)
+    study_area = serializers.PrimaryKeyRelatedField(queryset=StudyArea.objects.all())
 
     class Meta:
         model = Discipline
-        fields = ['id', 'name', 'areas_of_study']
+        fields = ['id', 'name', 'description', 'study_area']
 
     def create(self, validated_data):
-        areas_data = validated_data.pop('areas_of_study', [])
-        discipline = Discipline.objects.create(**validated_data)
-
-        for area_data in areas_data:
-            area, _ = AreaOfStudy.objects.get_or_create(**area_data)
-            discipline.areas_of_study.add(area)
-
-        return discipline
-
-    def update(self, instance, validated_data):
-        instance.name = validated_data.get('name', instance.name)
-        instance.save()
-
-        areas_data = validated_data.pop('areas_of_study', None)
-        if areas_data is not None:
-            current_areas = []
-            for area_data in areas_data:
-                area, _ = AreaOfStudy.objects.get_or_create(**area_data)
-                current_areas.append(area.id)
-
-            instance.areas_of_study.set(current_areas)
-
-        return instance
+        return Discipline.objects.create(**validated_data)

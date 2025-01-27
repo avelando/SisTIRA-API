@@ -1,6 +1,11 @@
 from rest_framework import serializers
-from .models import Question, Alternative
-from disciplines.models import Discipline
+from .models import Question, Alternative, Discipline
+
+class DisciplineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Discipline
+        fields = ['id', 'name', 'creator', 'question']
+        read_only_fields = ['creator', 'question']
 
 class AlternativeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -8,44 +13,23 @@ class AlternativeSerializer(serializers.ModelSerializer):
         fields = ['id', 'content', 'correct']
 
 class QuestionSerializer(serializers.ModelSerializer):
-    alternatives = AlternativeSerializer(many=True, required=False)
-    disciplines = serializers.PrimaryKeyRelatedField(queryset=Discipline.objects.all(), many=True)
+    alternatives = AlternativeSerializer(many=True, required=False)  # Alternativas opcionais
+    disciplines = DisciplineSerializer(many=True, required=False)  # Disciplinas opcionais
 
     class Meta:
         model = Question
         fields = ['id', 'text', 'question_type', 'disciplines', 'alternatives', 'created_at', 'creator']
         read_only_fields = ['created_at', 'creator']
 
-    def validate(self, data):
-        if data['question_type'] == 'OBJ' and not data.get('alternatives'):
-            raise serializers.ValidationError("Questões objetivas devem ter pelo menos uma alternativa.")
-        if data['question_type'] == 'SUB' and data.get('alternatives'):
-            raise serializers.ValidationError("Questões subjetivas não podem ter alternativas.")
-        return data
-
     def create(self, validated_data):
+        disciplines_data = validated_data.pop('disciplines', [])
         alternatives_data = validated_data.pop('alternatives', [])
-        disciplines = validated_data.pop('disciplines', [])
         question = Question.objects.create(**validated_data)
-        question.disciplines.set(disciplines)
+
+        for discipline_data in disciplines_data:
+            Discipline.objects.create(question=question, creator=self.context['request'].user, **discipline_data)
 
         for alternative_data in alternatives_data:
             Alternative.objects.create(question=question, **alternative_data)
 
         return question
-
-    def update(self, instance, validated_data):
-        alternatives_data = validated_data.pop('alternatives', None)
-        disciplines = validated_data.pop('disciplines', [])
-        
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.disciplines.set(disciplines)
-        instance.save()
-
-        if alternatives_data is not None:
-            instance.alternatives.all().delete()
-            for alternative_data in alternatives_data:
-                Alternative.objects.create(question=instance, **alternative_data)
-
-        return instance

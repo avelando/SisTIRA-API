@@ -1,16 +1,14 @@
 from django.db import models
 from accounts.models import CustomUser
-from disciplines.models import Discipline
 
 class Question(models.Model):
     QUESTION_TYPES = [
         ('OBJ', 'Objetiva'),
-        ('SUB', 'Subjetiva')
+        ('SUB', 'Subjetiva'),
     ]
 
-    text = models.TextField() 
+    text = models.TextField()
     question_type = models.CharField(max_length=3, choices=QUESTION_TYPES)
-    disciplines = models.ManyToManyField(Discipline, related_name="questions")
     created_at = models.DateTimeField(auto_now_add=True)
     creator = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="questions")
 
@@ -21,7 +19,16 @@ class Question(models.Model):
 class Alternative(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="alternatives")
     content = models.TextField()
-    correct = models.BooleanField(default=False) 
+    correct = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.content} ({'Correta' if self.correct else 'Errada'})"
+
+class Discipline(models.Model):
+    name = models.CharField(max_length=100)
+    creator = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="disciplines")
+    question = models.ForeignKey('Question', on_delete=models.CASCADE, related_name="disciplines")
+
+    def __str__(self):
+        return self.name
+

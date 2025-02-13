@@ -13,8 +13,10 @@ class AlternativeSerializer(serializers.ModelSerializer):
         fields = ['id', 'content', 'correct']
 
 class QuestionSerializer(serializers.ModelSerializer):
-    alternatives = AlternativeSerializer(many=True, required=False)  # Alternativas opcionais
-    disciplines = DisciplineSerializer(many=True, required=False)  # Disciplinas opcionais
+    alternatives = AlternativeSerializer(many=True, required=False)
+    disciplines = serializers.ListField(
+        child=serializers.CharField(), write_only=True
+    )
 
     class Meta:
         model = Question
@@ -26,8 +28,12 @@ class QuestionSerializer(serializers.ModelSerializer):
         alternatives_data = validated_data.pop('alternatives', [])
         question = Question.objects.create(**validated_data)
 
-        for discipline_data in disciplines_data:
-            Discipline.objects.create(question=question, creator=self.context['request'].user, **discipline_data)
+        for discipline_name in disciplines_data:
+            Discipline.objects.create(
+                name=discipline_name,
+                creator=self.context['request'].user,
+                question=question
+            )
 
         for alternative_data in alternatives_data:
             Alternative.objects.create(question=question, **alternative_data)

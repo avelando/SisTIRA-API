@@ -6,5 +6,6 @@ urlpatterns = [
     path('api/auth/', include('rest_framework.urls')),
     path('api/accounts/', include('accounts.urls')),
     path('api/questions/', include('questions.urls')),
-    path('api/question-banks/', include('question_banks.urls')),
+    path('api/question-banks/', include('questionsBank.urls')),
+    path('api/exams/', include('exams.urls')),
 ]

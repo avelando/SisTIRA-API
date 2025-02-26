@@ -6,16 +6,18 @@ from rest_framework.authtoken.models import Token
 from django.utils.timezone import now
 from django.conf import settings
 import datetime
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
-# from django.utils.decorators import method_decorator
-# from django.views.decorators.csrf import csrf_exempt
+
 from .models import CustomUser
 from .serializers import UserSerializer
 
 from django.http import JsonResponse
 
+@method_decorator(csrf_exempt, name='dispatch')
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
@@ -23,19 +25,18 @@ class LoginView(APIView):
         email = request.data.get('email')
         password = request.data.get('password')
 
-        user = authenticate(request, username=email, password=password)
+        user = authenticate(username=email, password=password)
 
-        if user is not None:
+        if user:
             token, created = Token.objects.get_or_create(user=user)
 
-            # 🔥 Se o token já existir e for antigo, renovar ele
             if not created and (now() - token.created) > settings.TOKEN_EXPIRATION_TIME:
                 token.delete()
                 token = Token.objects.create(user=user)
 
             response = JsonResponse({
                 'message': 'Login realizado com sucesso!',
-                'token': token.key,  # 🔥 Enviando o token no JSON
+                'token': token.key,
                 'user': {
                     'id': user.id,
                     'username': user.username,
@@ -49,8 +50,7 @@ class LoginView(APIView):
                 key='authToken',
                 value=token.key,
                 httponly=True,
-                domain="127.0.0.1",
-                samesite='None',
+                samesite='Lax',
                 secure=False
             )
 
@@ -86,7 +86,6 @@ class UserViewSet(ModelViewSet):
             return CustomUser.objects.all()
         return CustomUser.objects.filter(id=self.request.user.id)
 
-
     def perform_update(self, serializer):
         if serializer.instance != self.request.user and not self.request.user.is_superuser:
             raise PermissionDenied("Você só pode editar seus próprios dados.")
@@ -96,4 +95,3 @@ class UserViewSet(ModelViewSet):
         if instance != self.request.user and not self.request.user.is_superuser:
             raise PermissionDenied("Você só pode excluir sua própria conta.")
         instance.delete()
-

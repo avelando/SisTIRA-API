@@ -17,7 +17,6 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = ['*']
 
-CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost",
     "http://localhost:3000",
@@ -53,6 +52,11 @@ CSRF_TRUSTED_ORIGINS = [
     "http://10.1.15.9",
     "http://10.1.15.9:3000",
 ]
+
+CSRF_USE_SESSIONS = True
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
 
 SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
@@ -148,7 +152,7 @@ AUTH_PASSWORD_VALIDATORS = [
 AUTH_USER_MODEL = 'accounts.CustomUser'
 
 AUTHENTICATION_BACKENDS = [
-    'accounts.backends.EmailOrUsernameBackend',
+     # 'accounts.backends.EmailOrUsernameBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 

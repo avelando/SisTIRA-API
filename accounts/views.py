@@ -50,8 +50,8 @@ class LoginView(APIView):
                 key='authToken',
                 value=token.key,
                 httponly=True,
-                samesite='Lax',
-                secure=False
+                samesite='None',
+                secure=True
             )
 
             return response

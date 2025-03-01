@@ -2,11 +2,10 @@ from pathlib import Path
 from decouple import config
 import os
 import environ
-
 from datetime import timedelta
+from corsheaders.defaults import default_headers
 
-TOKEN_EXPIRATION_TIME = timedelta(days=7)
-
+# Configuração base
 BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
@@ -15,54 +14,33 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-m!u2*-a@p6(!$rgwqmcsj
 
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ["*"]  # Permite acesso de qualquer domínio
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost",
-    "http://localhost:3000",
-    "http://127.0.0.1",
-    "http://127.0.0.1:3000",
-    "http://10.1.15.9",
-    "http://10.1.15.9:3000",
-]
-
-CORS_ALLOW_CREDENTIALS = True
-
-CORS_ALLOW_HEADERS = [
+# CORS Configuração - Permite acesso de QUALQUER ORIGEM
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True  # Permite cookies e autenticação
+CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+CORS_ALLOW_HEADERS = list(default_headers) + [
     "authorization",
     "content-type",
     "x-csrftoken",
     "x-requested-with",
 ]
 
-CORS_ALLOW_METHODS = [
-    "GET",
-    "POST",
-    "PUT",
-    "PATCH",
-    "DELETE",
-    "OPTIONS",
-]
-
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost",
-    "http://localhost:3000",
-    "http://127.0.0.1",
-    "http://127.0.0.1:3000",
-    "http://10.1.15.9",
-    "http://10.1.15.9:3000",
-]
-
-CSRF_USE_SESSIONS = True
+# CSRF Configuração - Permite requisições de qualquer origem
+CSRF_TRUSTED_ORIGINS = ["*"]
 CSRF_COOKIE_SECURE = False
 CSRF_COOKIE_HTTPONLY = True
-CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'None'
 
 SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
 SESSION_COOKIE_SECURE = False
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
+
+# Tempo de expiração do Token
+TOKEN_EXPIRATION_TIME = timedelta(days=7)
 
 INSTALLED_APPS = [
     'rest_framework',
@@ -97,7 +75,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware',  # Mantido desativado para evitar conflitos
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -135,24 +113,15 @@ DATABASES = {
 }
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
 AUTH_USER_MODEL = 'accounts.CustomUser'
 
 AUTHENTICATION_BACKENDS = [
-     # 'accounts.backends.EmailOrUsernameBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
@@ -162,9 +131,6 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = '/static/'
-
-# STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-
 STATIC_ROOT = '/home/avelar/SisTIRA-API/staticfiles/'
 
 STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'

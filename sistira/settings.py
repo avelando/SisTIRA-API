@@ -1,24 +1,19 @@
 from pathlib import Path
 from decouple import config
 import os
-import environ
 from datetime import timedelta
 from corsheaders.defaults import default_headers
 
-# Configuração base
 BASE_DIR = Path(__file__).resolve().parent.parent
-env = environ.Env()
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-m!u2*-a@p6(!$rgwqmcsjt2co)h^uh%bjmf%c2t)27ve#r55pp')
+SECRET_KEY = config('SECRET_KEY')
 
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ["*"]  # Permite acesso de qualquer domínio
+ALLOWED_HOSTS = ["*"]
 
-# CORS Configuração - Permite acesso de QUALQUER ORIGEM
 CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True  # Permite cookies e autenticação
+CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "authorization",
@@ -27,8 +22,14 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
     "x-requested-with",
 ]
 
-# CSRF Configuração - Permite requisições de qualquer origem
-CSRF_TRUSTED_ORIGINS = ["*"]
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost",
+    "http://127.0.0.1",
+    "http://10.1.15.9",
+    "http://liara.picos.ifpi.edu.br",
+    "https://liara.picos.ifpi.edu.br"
+]
+
 CSRF_COOKIE_SECURE = False
 CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = 'None'
@@ -39,7 +40,6 @@ SESSION_COOKIE_SECURE = False
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 
-# Tempo de expiração do Token
 TOKEN_EXPIRATION_TIME = timedelta(days=7)
 
 INSTALLED_APPS = [
@@ -75,7 +75,6 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    # 'django.middleware.csrf.CsrfViewMiddleware',  # Mantido desativado para evitar conflitos
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',

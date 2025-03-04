@@ -6,9 +6,10 @@ import { AuthModule } from './modules/auth/auth.module';
 import { AuthController } from './modules/auth/auth.controller';
 import { QuestionsModule } from './modules/questions/questions.module';
 import { QuestionBanksModule } from './modules/question-banks/question-banks.module'
+import { ExamsModule } from './modules/exams/exams.module';
 
 @Module({
-  imports: [UsersModule, AuthModule, QuestionsModule, QuestionBanksModule],
+  imports: [UsersModule, AuthModule, QuestionsModule, QuestionBanksModule, ExamsModule],
   controllers: [AppController, AuthController],
   providers: [AppService],
 })

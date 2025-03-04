@@ -1,0 +1,37 @@
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { PrismaService } from './database/prisma/prisma.service';
+import { ValidationPipe } from '@nestjs/common';
+import * as cookieParser from 'cookie-parser';
+import { setupSwagger } from './config/swagger.config';
+import * as express from 'express';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  app.enableCors({
+    origin: ['http://localhost:3000', 'http://liara.picos.ifpi.edu.br', 'http://127.0.0.1:3000', 'http://10.1.15.9'],
+    credentials: true,
+  });
+
+  app.use(cookieParser());
+
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
+
+  const prismaService = app.get(PrismaService);
+  await prismaService.onModuleInit();
+
+  setupSwagger(app);
+
+  await app.listen(3000);
+}
+bootstrap();

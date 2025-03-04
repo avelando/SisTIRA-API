@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String          @id @default(uuid())
+  username       String          @unique
+  email          String          @unique
+  password       String
+  firstName      String
+  lastName       String
+  isAdmin        Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+
+  questions      Question[]      @relation("UserQuestions")
+  disciplines    Discipline[]    @relation("UserDisciplines")
+  questionBanks  QuestionBank[]  @relation("UserQuestionBanks")
+}
+
+model Question {
+  id           String       @id @default(uuid())
+  text         String
+  questionType QuestionType
+  createdAt    DateTime     @default(now())
+
+  creatorId String
+  creator   User   @relation("UserQuestions", fields: [creatorId], references: [id], onDelete: Cascade)
+
+  alternatives Alternative[]
+  questionDisciplines QuestionDiscipline[] @relation("QuestionToDiscipline")
+
+  questionBanks QuestionBank[] @relation("QuestionBanks")
+}
+
+model Alternative {
+  id         String   @id @default(uuid())
+  content    String
+  correct    Boolean  @default(false)
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+model Discipline {
+  id         String   @id @default(uuid())
+  name       String
+  creatorId  String
+  creator    User @relation("UserDisciplines", fields: [creatorId], references: [id], onDelete: Cascade)
+  questionDisciplines QuestionDiscipline[] @relation("QuestionToDiscipline")
+}
+
+model QuestionDiscipline {
+  questionId   String
+  disciplineId String
+  question     Question  @relation(fields: [questionId], references: [id], onDelete: Cascade, name: "QuestionToDiscipline")
+  discipline   Discipline @relation(fields: [disciplineId], references: [id], onDelete: Cascade, name: "QuestionToDiscipline")
+
+  @@id([questionId, disciplineId]) 
+}
+
+enum QuestionType {
+  OBJ
+  SUB
+}
+
+model QuestionBank {
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  creatorId   String
+  creator     User       @relation("UserQuestionBanks", fields: [creatorId], references: [id], onDelete: Cascade)
+  questions   Question[] @relation("QuestionBanks")
+  predominantDisciplines String[]
+  createdAt   DateTime   @default(now())
+}

@@ -1,4 +1,6 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { 
+  Controller, Get, Post, Body, Param, Delete, Put, Patch, UseGuards, Req, ForbiddenException 
+} from '@nestjs/common';
 import { QuestionBanksService } from './question-banks.service';
 import { CreateQuestionBankDto } from './dto/create.dto';
 import { UpdateQuestionBankDto } from './dto/update.dto';
@@ -25,5 +27,37 @@ export class QuestionBanksController {
   findAll(@Req() req: Request) {
     if (!req.user || !req.user.userId) throw new ForbiddenException('Usuário não autenticado');
     return this.questionBanksService.findAll(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id')
+  @ApiOperation({ summary: 'Buscar um banco de questões específico' })
+  findOne(@Req() req: Request, @Param('id') id: string) {
+    if (!req.user || !req.user.userId) throw new ForbiddenException('Usuário não autenticado');
+    return this.questionBanksService.findOne(req.user.userId, id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put(':id')
+  @ApiOperation({ summary: 'Atualizar nome e descrição do banco de questões' })
+  update(@Req() req: Request, @Param('id') id: string, @Body() updateQuestionBankDto: UpdateQuestionBankDto) {
+    if (!req.user || !req.user.userId) throw new ForbiddenException('Usuário não autenticado');
+    return this.questionBanksService.update(req.user.userId, id, updateQuestionBankDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/add-questions')
+  @ApiOperation({ summary: 'Adicionar questões ao banco de questões' })
+  addQuestions(@Req() req: Request, @Param('id') id: string, @Body() body: { questions: string[] }) {
+    if (!req.user || !req.user.userId) throw new ForbiddenException('Usuário não autenticado');
+    return this.questionBanksService.addQuestions(req.user.userId, id, body.questions);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id')
+  @ApiOperation({ summary: 'Deletar um banco de questões' })
+  remove(@Req() req: Request, @Param('id') id: string) {
+    if (!req.user || !req.user.userId) throw new ForbiddenException('Usuário não autenticado');
+    return this.questionBanksService.remove(req.user.userId, id);
   }
 }

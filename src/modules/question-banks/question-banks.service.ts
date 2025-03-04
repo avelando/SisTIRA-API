@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { CreateQuestionBankDto } from './dto/create.dto';
 import { UpdateQuestionBankDto } from './dto/update.dto';
@@ -7,47 +7,80 @@ import { UpdateQuestionBankDto } from './dto/update.dto';
 export class QuestionBanksService {
   constructor(private prisma: PrismaService) {}
 
-  private async calculatePredominantDisciplines(questionIds: string[]): Promise<string[]> {
+  private async calculatePredominantDisciplines(questionBankId: string, questionIds: string[]) {
     const disciplinesCount: Record<string, number> = {};
 
     for (const questionId of questionIds) {
       const question = await this.prisma.question.findUnique({
         where: { id: questionId },
-        include: { questionDisciplines: { include: { discipline: { select: { name: true } } } } },
+        include: { questionDisciplines: { select: { disciplineId: true } } },
       });
 
       if (question) {
-        for (const { discipline } of question.questionDisciplines) {
-          disciplinesCount[discipline.name] = (disciplinesCount[discipline.name] || 0) + 1;
+        for (const { disciplineId } of question.questionDisciplines) {
+          disciplinesCount[disciplineId] = (disciplinesCount[disciplineId] || 0) + 1;
         }
       }
     }
 
-    return Object.entries(disciplinesCount)
+    const sortedDisciplines = Object.entries(disciplinesCount)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 2)
-      .map(([name]) => name);
+      .map(([disciplineId]) => disciplineId);
+
+    await this.prisma.questionBankDiscipline.deleteMany({
+      where: { questionBankId },
+    });
+
+    await this.prisma.questionBankDiscipline.createMany({
+      data: sortedDisciplines.map((disciplineId, index) => ({
+        questionBankId,
+        disciplineId,
+        isPredominant: index < 2, 
+      })),
+    });
   }
 
   async create(userId: string, data: CreateQuestionBankDto) {
-    const predominantDisciplines = await this.calculatePredominantDisciplines(data.questions || []);
+    const userQuestions = await this.prisma.question.findMany({
+      where: { id: { in: data.questions || [] }, creatorId: userId },
+      select: { id: true },
+    });
 
-    return this.prisma.questionBank.create({
+    if (userQuestions.length !== (data.questions || []).length) {
+      throw new ForbiddenException('Você só pode adicionar questões criadas por você mesmo.');
+    }
+
+    const questionBank = await this.prisma.questionBank.create({
       data: {
         name: data.name,
         description: data.description,
         creatorId: userId,
-        questions: { connect: data.questions?.map((id) => ({ id })) || [] },
-        predominantDisciplines,
+        questions: { create: data.questions?.map((id) => ({ questionId: id })) || [] },
       },
     });
+
+    await this.calculatePredominantDisciplines(questionBank.id, data.questions || []);
+
+    return questionBank;
   }
 
   async findAll(userId: string) {
     return this.prisma.questionBank.findMany({
       where: { creatorId: userId },
       include: {
-        questions: { select: { text: true, questionDisciplines: { include: { discipline: { select: { name: true } } } } } },
+        questions: {
+          include: {
+            question: {
+              select: {
+                text: true,
+                questionDisciplines: { include: { discipline: { select: { name: true } } } },
+              },
+            },
+          },
+        },
+        questionBankDisciplines: {
+          include: { discipline: { select: { name: true, id: true } } },
+        },
       },
     });
   }
@@ -55,7 +88,21 @@ export class QuestionBanksService {
   async findOne(userId: string, id: string) {
     const questionBank = await this.prisma.questionBank.findUnique({
       where: { id },
-      include: { questions: { select: { text: true, questionDisciplines: { include: { discipline: { select: { name: true } } } } } } },
+      include: {
+        questions: {
+          include: {
+            question: {
+              select: {
+                text: true,
+                questionDisciplines: { include: { discipline: { select: { name: true } } } },
+              },
+            },
+          },
+        },
+        questionBankDisciplines: {
+          include: { discipline: { select: { name: true, id: true } } },
+        },
+      },
     });
 
     if (!questionBank) throw new NotFoundException('Banco de questões não encontrado');
@@ -70,24 +117,69 @@ export class QuestionBanksService {
     if (!questionBank) throw new NotFoundException('Banco de questões não encontrado');
     if (questionBank.creatorId !== userId) throw new ForbiddenException('Acesso negado');
 
-    const predominantDisciplines = await this.calculatePredominantDisciplines(data.questions || []);
-
     return this.prisma.questionBank.update({
       where: { id },
       data: {
         name: data.name,
         description: data.description,
-        questions: { set: data.questions?.map((id) => ({ id })) || [] },
-        predominantDisciplines,
       },
     });
   }
 
+  async addQuestions(userId: string, id: string, questionIds: string[]) {
+    const questionBank = await this.prisma.questionBank.findUnique({
+      where: { id },
+      include: { questions: true },
+    });
+  
+    if (!questionBank) throw new NotFoundException('Banco de questões não encontrado');
+    if (questionBank.creatorId !== userId) throw new ForbiddenException('Acesso negado');
+  
+    const existingQuestionIds = new Set(questionBank.questions.map(q => q.questionId));
+  
+    const newQuestions = questionIds.filter(questionId => !existingQuestionIds.has(questionId));
+  
+    if (newQuestions.length === 0) {
+      throw new BadRequestException('Todas as questões já estão neste banco.');
+    }
+  
+    const validQuestions = await this.prisma.question.findMany({
+      where: { id: { in: newQuestions }, creatorId: userId },
+      select: { id: true },
+    });
+  
+    if (validQuestions.length !== newQuestions.length) {
+      throw new ForbiddenException('Você só pode adicionar questões criadas por você mesmo.');
+    }
+  
+    await this.prisma.questionBankQuestion.createMany({
+      data: newQuestions.map((questionId) => ({ questionBankId: id, questionId })),
+    });
+  
+    await this.calculatePredominantDisciplines(id, [
+      ...Array.from(existingQuestionIds) as string[],
+      ...newQuestions
+    ]);    
+  
+    return this.findOne(userId, id);
+  }  
+
   async remove(userId: string, id: string) {
-    const questionBank = await this.prisma.questionBank.findUnique({ where: { id } });
+    const questionBank = await this.prisma.questionBank.findUnique({
+      where: { id },
+      include: { questions: true },
+    });
 
     if (!questionBank) throw new NotFoundException('Banco de questões não encontrado');
     if (questionBank.creatorId !== userId) throw new ForbiddenException('Acesso negado');
+
+    await this.prisma.questionBankQuestion.deleteMany({
+      where: { questionBankId: id },
+    });
+
+    await this.prisma.questionBankDiscipline.deleteMany({
+      where: { questionBankId: id },
+    });
 
     return this.prisma.questionBank.delete({ where: { id } });
   }

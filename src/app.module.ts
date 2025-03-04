@@ -5,9 +5,10 @@ import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AuthController } from './modules/auth/auth.controller';
 import { QuestionsModule } from './modules/questions/questions.module';
+import { QuestionBanksModule } from './modules/question-banks/question-banks.module'
 
 @Module({
-  imports: [UsersModule, AuthModule, QuestionsModule],
+  imports: [UsersModule, AuthModule, QuestionsModule, QuestionBanksModule],
   controllers: [AppController, AuthController],
   providers: [AppService],
 })

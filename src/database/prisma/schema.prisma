@@ -20,6 +20,7 @@ model User {
   questions     Question[]     @relation("UserQuestions")
   disciplines   Discipline[]   @relation("UserDisciplines")
   questionBanks QuestionBank[] @relation("UserQuestionBanks")
+  exams         Exam[]         @relation("UserExams")
 }
 
 enum QuestionType {
@@ -39,6 +40,7 @@ model Question {
   alternatives        Alternative[]
   questionDisciplines QuestionDiscipline[]   @relation("QuestionToDiscipline")
   questionBanks       QuestionBankQuestion[] @relation("QuestionBankToQuestion")
+  exams               ExamQuestion[]         @relation("ExamToQuestion")
 }
 
 model Alternative {
@@ -76,6 +78,7 @@ model QuestionBank {
   creator                User                    @relation("UserQuestionBanks", fields: [creatorId], references: [id], onDelete: Cascade)
   questions              QuestionBankQuestion[]  @relation("QuestionBankToQuestion")
   questionBankDisciplines QuestionBankDiscipline[] @relation("BankToDisciplines")
+  exams                  Exam[]                  @relation("ExamToQuestionBank")
   createdAt              DateTime                @default(now())
 }
 
@@ -92,10 +95,31 @@ model QuestionBankDiscipline {
   id             String       @id @default(uuid())
   questionBankId String
   disciplineId   String
-  isPredominant  Boolean      @default(false) // Define se é uma disciplina predominante
+  isPredominant  Boolean      @default(false)
 
   questionBank   QuestionBank @relation(fields: [questionBankId], references: [id], onDelete: Cascade, name: "BankToDisciplines")
   discipline     Discipline   @relation(fields: [disciplineId], references: [id], onDelete: Cascade, name: "BankToDisciplines")
 
-  @@unique([questionBankId, disciplineId]) // Cada disciplina pode ser adicionada apenas uma vez por banco
+  @@unique([questionBankId, disciplineId])
+}
+
+model Exam {
+  id            String     @id @default(uuid())
+  name          String
+  description   String?
+  creatorId     String
+  creator       User       @relation("UserExams", fields: [creatorId], references: [id], onDelete: Cascade)
+  questions     ExamQuestion[] @relation("ExamToQuestion")
+  questionBankId String?
+  questionBank  QuestionBank? @relation(fields: [questionBankId], references: [id], onDelete: Cascade, name: "ExamToQuestionBank")
+  createdAt     DateTime   @default(now())
+}
+
+model ExamQuestion {
+  examId     String
+  questionId String
+  exam       Exam      @relation(fields: [examId], references: [id], onDelete: Cascade, name: "ExamToQuestion")
+  question   Question  @relation(fields: [questionId], references: [id], onDelete: Cascade, name: "ExamToQuestion")
+
+  @@id([examId, questionId])
 }

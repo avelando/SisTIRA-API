@@ -7,6 +7,9 @@ import { setupSwagger } from './config/swagger.config';
 import * as express from 'express';
 
 async function bootstrap() {
+
+  const PORT = process.env.PORT || 3001;
+
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
@@ -32,6 +35,7 @@ async function bootstrap() {
 
   setupSwagger(app);
 
-  await app.listen(3000);
+  await app.listen(PORT);
+  console.log(`🚀 Server is running on http://localhost:${PORT}`);
 }
 bootstrap();

@@ -7,9 +7,20 @@ import { AuthController } from './modules/auth/auth.controller';
 import { QuestionsModule } from './modules/questions/questions.module';
 import { QuestionBanksModule } from './modules/question-banks/question-banks.module'
 import { ExamsModule } from './modules/exams/exams.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [UsersModule, AuthModule, QuestionsModule, QuestionBanksModule, ExamsModule],
+  imports: 
+    [
+      UsersModule, 
+      AuthModule, 
+      QuestionsModule, 
+      QuestionBanksModule, 
+      ExamsModule, 
+      ConfigModule.forRoot({
+        isGlobal: true,
+      }),
+    ],
   controllers: [AppController, AuthController],
   providers: [AppService],
 })

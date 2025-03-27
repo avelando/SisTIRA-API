@@ -8,51 +8,33 @@ export class ExamsService {
   constructor(private prisma: PrismaService) {}
 
   async create(userId: string, data: CreateExamDto) {
-    let questionsToConnect = data.questions ?? [];
-
-    const questionBank = data.questionBankId
-      ? await this.prisma.questionBank.findUnique({
-          where: { id: data.questionBankId },
-          include: { questions: { select: { questionId: true } } },
-        })
-      : null;
-
-    if (data.questionBankId && !questionBank) {
-      throw new NotFoundException('Banco de questões não encontrado.');
-    }
-
-    questionsToConnect = [
-      ...new Set([
-        ...questionsToConnect,
-        ...(questionBank?.questions?.map(q => q.questionId) || []),
-      ]),
-    ];
-
     return this.prisma.exam.create({
       data: {
-        name: data.name,
+        title: data.title,
         description: data.description,
         creatorId: userId,
-        questionBankId: data.questionBankId || null,
-        questions: {
-          create: questionsToConnect.map(questionId => ({
-            question: { connect: { id: questionId } }
-          })),
-        },
       },
       include: {
-        questionBank: { select: { id: true, name: true } },
         questions: { select: { question: { select: { text: true } } } },
+        examQuestionBanks: { select: { questionBank: { select: { id: true, name: true } } } },
       },
-    });    
-  }
+    });
+  }  
 
   async findAll(userId: string) {
     return this.prisma.exam.findMany({
       where: { creatorId: userId },
       include: {
-        questionBank: { select: { id: true, name: true } },
-        questions: { select: { question: { select: { text: true } } } },
+        questions: {
+          select: {
+            question: { select: { text: true } }
+          }
+        },
+        examQuestionBanks: {
+          select: {
+            questionBank: { select: { id: true, name: true } }
+          }
+        }
       },
     });
   }
@@ -60,17 +42,68 @@ export class ExamsService {
   async findOne(userId: string, id: string) {
     const exam = await this.prisma.exam.findUnique({
       where: { id },
-      include: {
-        questionBank: { select: { id: true, name: true } },
-        questions: { select: { question: { select: { text: true } } } },
-      },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        creatorId: true,
+        questions: {
+          select: {
+            question: {
+              select: {
+                id: true,
+                text: true,
+                questionType: true,
+                alternatives: {
+                  select: { id: true, content: true }
+                }
+              }
+            }
+          }
+        },
+        examQuestionBanks: {
+          select: {
+            questionBank: {
+              select: {
+                id: true,
+                name: true,
+                questions: {
+                  select: {
+                    question: {
+                      select: {
+                        id: true,
+                        text: true,
+                        questionType: true,
+                        alternatives: {
+                          select: { id: true, content: true }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     });
-
+  
     if (!exam) throw new NotFoundException('Prova não encontrada');
     if (exam.creatorId !== userId) throw new ForbiddenException('Acesso negado');
-
-    return exam;
-  }
+  
+    const manualQuestions = exam.questions.map(q => q.question);
+    const bankQuestions = exam.examQuestionBanks.flatMap(b => b.questionBank.questions.map(q => q.question));
+  
+    const allQuestionsMap = new Map();
+    [...manualQuestions, ...bankQuestions].forEach(q => {
+      allQuestionsMap.set(q.id, q);
+    });
+  
+    return {
+      ...exam,
+      allQuestions: Array.from(allQuestionsMap.values()),
+    };
+  }  
 
   async update(userId: string, id: string, data: UpdateExamDto) {
     const exam = await this.prisma.exam.findUnique({
@@ -84,7 +117,7 @@ export class ExamsService {
     const updatedExam = await this.prisma.exam.update({
       where: { id },
       data: {
-        name: data.name,
+        title: data.title,
         description: data.description,
         questions: {
           deleteMany: {},
@@ -95,8 +128,16 @@ export class ExamsService {
         },
       },
       include: {
-        questionBank: { select: { id: true, name: true } },
-        questions: { select: { question: { select: { text: true } } } },
+        questions: {
+          select: {
+            question: { select: { text: true } }
+          }
+        },
+        examQuestionBanks: {
+          select: {
+            questionBank: { select: { id: true, name: true } }
+          }
+        }
       },
     });
 
@@ -111,4 +152,159 @@ export class ExamsService {
 
     return this.prisma.exam.delete({ where: { id } });
   }
+
+  async addQuestions(userId: string, examId: string, questionIds: string[]) {
+    const exam = await this.prisma.exam.findUnique({
+      where: { id: examId },
+      include: {
+        examQuestionBanks: {
+          select: {
+            questionBank: {
+              select: {
+                questions: { select: { questionId: true } }
+              }
+            }
+          }
+        }
+      }
+    });
+  
+    if (!exam) throw new NotFoundException('Prova não encontrada');
+    if (exam.creatorId !== userId) throw new ForbiddenException('Acesso negado');
+  
+    const bankQuestionIds = exam.examQuestionBanks.flatMap(bank =>
+      bank.questionBank.questions.map(q => q.questionId)
+    );
+  
+    const filtered = questionIds.filter(id => !bankQuestionIds.includes(id));
+  
+    await this.prisma.examQuestion.createMany({
+      data: filtered.map(questionId => ({ examId, questionId })),
+      skipDuplicates: true,
+    });
+  
+    return this.prisma.exam.findUnique({
+      where: { id: examId },
+      include: {
+        questions: { select: { question: { select: { id: true, text: true } } } },
+        examQuestionBanks: {
+          select: {
+            questionBank: {
+              select: {
+                id: true,
+                name: true,
+                questions: { select: { question: { select: { id: true, text: true } } } }
+              }
+            }
+          }
+        }
+      }
+    });
+  }   
+
+  async removeQuestions(userId: string, examId: string, questionIds: string[]) {
+    const exam = await this.prisma.exam.findUnique({ where: { id: examId } });
+    if (!exam) throw new NotFoundException('Prova não encontrada');
+    if (exam.creatorId !== userId) throw new ForbiddenException('Acesso negado');
+
+    return this.prisma.examQuestion.deleteMany({
+      where: {
+        examId,
+        questionId: { in: questionIds }
+      }
+    });
+  }
+
+  async addBanks(userId: string, examId: string, bankIds: string[]) {
+    const exam = await this.prisma.exam.findUnique({ where: { id: examId } });
+    if (!exam) throw new NotFoundException('Prova não encontrada');
+    if (exam.creatorId !== userId) throw new ForbiddenException('Acesso negado');
+
+    await this.prisma.examQuestionBank.createMany({
+      data: bankIds.map(bankId => ({ examId, questionBankId: bankId })),
+      skipDuplicates: true,  // pula relações já existentes
+    });
+
+    return this.prisma.exam.findUnique({
+      where: { id: examId },
+      include: { examQuestionBanks: { select: { questionBank: { select: { id: true, name: true } } } } },
+    });
+  }
+
+  async removeBanks(userId: string, examId: string, bankIds: string[]) {
+    const exam = await this.prisma.exam.findUnique({ where: { id: examId } });
+    if (!exam) throw new NotFoundException('Prova não encontrada');
+    if (exam.creatorId !== userId) throw new ForbiddenException('Acesso negado');
+
+    return this.prisma.examQuestionBank.deleteMany({
+      where: {
+        examId,
+        questionBankId: { in: bankIds }
+      }
+    });
+  }
+
+  async respondToExam(userId: string, examId: string, answers: { questionId: string; alternativeId?: string; textResponse?: string }[]) {
+    const exam = await this.prisma.exam.findUnique({ where: { id: examId } });
+    if (!exam) throw new NotFoundException('Prova não encontrada');
+  
+    if (!exam.isPublic && !exam.accessCode) {
+      throw new ForbiddenException('Prova privada');
+    }
+  
+    return this.prisma.examResponse.create({
+      data: {
+        userId,
+        examId,
+        answers: {
+          create: answers.map(ans => ({
+            questionId: ans.questionId,
+            alternativeId: ans.alternativeId,
+            textResponse: ans.textResponse
+          }))
+        }
+      }
+    });
+  }
+
+  async getExamResponses(userId: string, examId: string) {
+    const exam = await this.prisma.exam.findUnique({
+      where: { id: examId },
+    });
+  
+    if (!exam) throw new NotFoundException('Prova não encontrada');
+    if (exam.creatorId !== userId) throw new ForbiddenException('Acesso negado');
+  
+    return this.prisma.examResponse.findMany({
+      where: { examId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        answers: {
+          include: {
+            question: {
+              select: {
+                id: true,
+                text: true,
+                questionType: true,
+              },
+            },
+            alternative: {
+              select: {
+                id: true,
+                content: true,
+                correct: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }  
 }

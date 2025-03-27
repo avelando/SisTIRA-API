@@ -5,7 +5,7 @@ export class UpdateExamDto {
   @ApiProperty({ example: 'Prova de Matemática', required: false })
   @IsOptional()
   @IsString()
-  name?: string;
+  title?: string;
 
   @ApiProperty({ example: 'Prova atualizada', required: false })
   @IsOptional()

@@ -183,4 +183,27 @@ export class QuestionBanksService {
 
     return this.prisma.questionBank.delete({ where: { id } });
   }
+
+  async removeQuestions(userId: string, id: string, questionIds: string[]) {
+    const bank = await this.prisma.questionBank.findUnique({
+      where: { id },
+      include: { questions: true },
+    });
+    if (!bank) throw new NotFoundException('Banco de questões não encontrado');
+    if (bank.creatorId !== userId) throw new ForbiddenException('Acesso negado');
+  
+    await this.prisma.questionBankQuestion.deleteMany({
+      where: {
+        questionBankId: id,
+        questionId: { in: questionIds },
+      },
+    });
+  
+    const remainingIds = bank.questions
+      .map(q => q.questionId)
+      .filter(qId => !questionIds.includes(qId));
+    await this.calculatePredominantDisciplines(id, remainingIds);
+  
+    return this.findOne(userId, id);
+  }
 }

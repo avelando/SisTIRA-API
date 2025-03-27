@@ -60,4 +60,16 @@ export class QuestionBanksController {
     if (!req.user || !req.user.userId) throw new ForbiddenException('Usuário não autenticado');
     return this.questionBanksService.remove(req.user.userId, id);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/remove-questions')
+  @ApiOperation({ summary: 'Remover questões do banco de questões' })
+  removeQuestions(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() body: { questions: string[] },
+  ) {
+    if (!req.user?.userId) throw new ForbiddenException('Usuário não autenticado');
+    return this.questionBanksService.removeQuestions(req.user.userId, id, body.questions);
+  }
 }

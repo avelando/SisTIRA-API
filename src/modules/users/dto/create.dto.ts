@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, MinLength, Matches } from 'class-validator';
+import { IsEmail, IsNotEmpty, MinLength, Matches, IsIn } from 'class-validator';
 
 export class CreateUserDto {
   @ApiProperty({
@@ -40,4 +40,13 @@ export class CreateUserDto {
   })
   @IsNotEmpty({ message: 'O sobrenome é obrigatório' })
   lastName: string;
+
+  @ApiProperty({
+    example: 'STUDENT',
+    enum: ['STUDENT', 'TEACHER'],
+    description: 'Tipo de perfil do usuário.',
+  })
+  @IsNotEmpty({ message: 'O tipo de perfil é obrigatório' })
+  @IsIn(['STUDENT', 'TEACHER'], { message: 'Tipo de perfil inválido' })
+  profileType: 'STUDENT' | 'TEACHER';
 }

@@ -36,6 +36,7 @@ export class UsersService {
         password: hashedPassword,
         firstName: data.firstName.trim(),
         lastName: data.lastName.trim(),
+        profileType: data.profileType,
       },
     });
   }
@@ -53,7 +54,7 @@ export class UsersService {
   async updateUser(userId: string, data: UpdateUserDto) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Usuário não encontrado');
-
+  
     if (data.email || data.username) {
       const existingUser = await this.prisma.user.findFirst({
         where: {
@@ -64,23 +65,30 @@ export class UsersService {
           NOT: { id: userId },
         },
       });
-
+  
       if (existingUser) {
         console.error(`Erro ao atualizar usuário: Email ou Username já em uso (${data.email} | ${data.username})`);
         throw new BadRequestException('Já existe um usuário com este e-mail ou username.');
       }
     }
-
+  
+    const updatedData: any = {};
+  
+    if (data.username) updatedData.username = data.username;
+    if (data.email) updatedData.email = data.email;
+    if (data.firstName) updatedData.firstName = data.firstName;
+    if (data.lastName) updatedData.lastName = data.lastName;
+    if (data.profileType) updatedData.profileType = data.profileType;
+  
+    if (data.profileImageUrl !== undefined) {
+      updatedData.profileImageUrl = data.profileImageUrl;
+    }
+  
     return this.prisma.user.update({
       where: { id: userId },
-      data: {
-        username: data.username,
-        email: data.email,
-        firstName: data.firstName,
-        lastName: data.lastName,
-      },
+      data: updatedData,
     });
-  }
+  }  
 
   async deleteUser(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });

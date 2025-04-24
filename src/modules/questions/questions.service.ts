@@ -34,28 +34,34 @@ export class QuestionsService {
   }
 
   async create(userId: string, data: CreateQuestionDto) {
-    if (!data.disciplines || data.disciplines.length === 0) {
-      throw new ForbiddenException('Uma questão deve ter pelo menos uma disciplina associada.');
-    }
-
-    const disciplinesToConnect = await this.processDisciplines(userId, data.disciplines);
+    const disciplinesToConnect = data.disciplines?.length
+      ? await this.processDisciplines(userId, data.disciplines)
+      : [];
 
     return this.prisma.question.create({
       data: {
         text: data.text,
         questionType: data.questionType,
         creatorId: userId,
-        questionDisciplines: {
-          create: disciplinesToConnect.map(d => ({
-            discipline: { connect: { id: d.disciplineId } }
-          }))
-        },
+        educationLevel: data.educationLevel ?? null,
+        difficulty: data.difficulty ?? null,
+        examReference: data.examReference ?? null,
+        questionDisciplines: disciplinesToConnect.length
+          ? {
+              create: disciplinesToConnect.map(d => ({
+                discipline: { connect: { id: d.disciplineId } },
+              })),
+            }
+          : undefined,
         alternatives: data.questionType === 'SUB' ? undefined : { create: data.alternatives ?? [] },
       },
       select: {
         id: true,
         text: true,
         questionType: true,
+        educationLevel: true,
+        difficulty: true,
+        examReference: true,
         questionDisciplines: { select: { discipline: { select: { id: true, name: true } } } },
         alternatives: { select: { content: true, correct: true } },
       },
@@ -69,6 +75,9 @@ export class QuestionsService {
         id: true,
         text: true,
         questionType: true,
+        educationLevel: true,
+        difficulty: true,
+        examReference: true,
         questionDisciplines: { select: { discipline: { select: { id: true, name: true } } } },
         alternatives: { select: { content: true, correct: true } },
       },
@@ -82,6 +91,9 @@ export class QuestionsService {
         id: true,
         text: true,
         questionType: true,
+        educationLevel: true,
+        difficulty: true,
+        examReference: true,
         questionDisciplines: { select: { discipline: { select: { id: true, name: true } } } },
         alternatives: { select: { content: true, correct: true } },
       },
@@ -126,6 +138,9 @@ export class QuestionsService {
       data: {
         text: data.text,
         questionType: data.questionType,
+        educationLevel: data.educationLevel ?? null,
+        difficulty: data.difficulty ?? null,
+        examReference: data.examReference ?? null,
         questionDisciplines: {
           deleteMany: deleteConnections.length ? deleteConnections : undefined,
           create: createConnections.length ? createConnections : undefined,
@@ -136,6 +151,9 @@ export class QuestionsService {
         id: true,
         text: true,
         questionType: true,
+        educationLevel: true,
+        difficulty: true,
+        examReference: true,
         questionDisciplines: {
           select: {
             discipline: {

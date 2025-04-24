@@ -55,7 +55,7 @@ export class ExamsService {
                 text: true,
                 questionType: true,
                 alternatives: {
-                  select: { id: true, content: true }
+                  select: { id: true, content: true, correct: true }
                 }
               }
             }
@@ -67,6 +67,9 @@ export class ExamsService {
               select: {
                 id: true,
                 name: true,
+                description: true,
+                creatorId: true,
+                createdAt: true,
                 questions: {
                   select: {
                     question: {
@@ -75,7 +78,11 @@ export class ExamsService {
                         text: true,
                         questionType: true,
                         alternatives: {
-                          select: { id: true, content: true }
+                          select: {
+                            id: true,
+                            content: true,
+                            correct: true,
+                          }
                         }
                       }
                     }
@@ -84,7 +91,7 @@ export class ExamsService {
               }
             }
           }
-        }
+        }        
       }
     });
   
@@ -183,23 +190,7 @@ export class ExamsService {
       skipDuplicates: true,
     });
   
-    return this.prisma.exam.findUnique({
-      where: { id: examId },
-      include: {
-        questions: { select: { question: { select: { id: true, text: true } } } },
-        examQuestionBanks: {
-          select: {
-            questionBank: {
-              select: {
-                id: true,
-                name: true,
-                questions: { select: { question: { select: { id: true, text: true } } } }
-              }
-            }
-          }
-        }
-      }
-    });
+    return this.findOne(userId, examId);
   }   
 
   async removeQuestions(userId: string, examId: string, questionIds: string[]) {

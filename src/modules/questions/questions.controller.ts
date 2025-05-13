@@ -4,13 +4,13 @@ import { PrismaService } from 'src/database/prisma/prisma.service';
 import { CreateQuestionDto } from './dto/create.dto';
 import { UpdateQuestionDto } from './dto/update.dto';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { JwtAuthGuard } from 'src/modules/auth/jwt-auth.guard';
+import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { Request } from 'express';
 
 @ApiTags('Questões')
 @Controller('questions')
 export class QuestionsController {
-  constructor(private readonly questionsService: QuestionsService, private prisma: PrismaService) {}
+  constructor(private readonly questionsService: QuestionsService, private prisma: PrismaService) { }
 
   @UseGuards(JwtAuthGuard)
   @Get()

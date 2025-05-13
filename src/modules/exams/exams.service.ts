@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { CreateExamDto } from './dto/create.dto';
 import { UpdateExamDto } from './dto/update.dto';
+import { CreateManualQuestionDto } from './dto/create-question.dto';
 
 @Injectable()
 export class ExamsService {
@@ -297,5 +298,61 @@ export class ExamsService {
         },
       },
     });
+  }
+
+  async createQuestionAndAddToExam(userId: string, examId: string, data: CreateManualQuestionDto) {
+    const exam = await this.prisma.exam.findUnique({ where: { id: examId } });
+  
+    if (!exam) throw new NotFoundException('Prova não encontrada');
+    if (exam.creatorId !== userId) throw new ForbiddenException('Acesso negado');
+  
+    const disciplinesToConnect = data.disciplines?.length
+      ? await Promise.all(
+          data.disciplines.map(async (name) => {
+            let discipline = await this.prisma.discipline.findFirst({
+              where: { name, creatorId: userId },
+            });
+            if (!discipline) {
+              discipline = await this.prisma.discipline.create({
+                data: { name, creatorId: userId },
+              });
+            }
+            return { disciplineId: discipline.id };
+          })
+        )
+      : [];
+  
+    const question = await this.prisma.question.create({
+      data: {
+        text: data.text,
+        questionType: data.questionType,
+        creatorId: userId,
+        questionDisciplines: disciplinesToConnect.length
+          ? {
+              create: disciplinesToConnect.map((d) => ({
+                discipline: { connect: { id: d.disciplineId } },
+              })),
+            }
+          : undefined,
+        alternatives: data.questionType === 'OBJ'
+          ? {
+              create: data.alternatives?.map((alt) => ({
+                content: alt.content,
+                correct: alt.correct,
+              })) ?? [],
+            }
+          : undefined,
+      },
+      select: { id: true },
+    });
+  
+    await this.prisma.examQuestion.create({
+      data: {
+        examId,
+        questionId: question.id,
+      },
+    });
+  
+    return this.findOne(userId, examId);
   }  
 }

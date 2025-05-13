@@ -1,5 +1,5 @@
-import { 
-  Controller, Post, Body, Get, UseGuards, Patch, Delete, Req, UnauthorizedException, 
+import {
+  Controller, Post, Body, Get, UseGuards, Patch, Delete, Req, UnauthorizedException,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
@@ -9,7 +9,7 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create.dto';
 import { UpdateUserDto } from './dto/update.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
-import { JwtAuthGuard } from 'src/modules/auth/jwt-auth.guard';
+import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { cloudinaryV2 } from 'src/config/cloudinary.config';
@@ -27,7 +27,7 @@ function bufferToStream(buffer: Buffer): Readable {
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   @Post()
   @ApiOperation({ summary: 'Criar um novo usuário', description: 'Cria um novo usuário na plataforma.' })
@@ -67,7 +67,7 @@ export class UsersController {
     if (!req.user) throw new UnauthorizedException('Usuário não autenticado');
     return this.usersService.updateUser(req.user.userId, updateUserDto);
   }
-  
+
   @Patch('me/profile-image')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

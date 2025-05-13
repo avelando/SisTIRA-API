@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, MinLength, Matches, IsIn } from 'class-validator';
+import { IsEmail, IsNotEmpty, MinLength, Matches, IsIn, IsOptional } from 'class-validator';
 
 export class CreateUserDto {
   @ApiProperty({
@@ -49,4 +49,15 @@ export class CreateUserDto {
   @IsNotEmpty({ message: 'O tipo de perfil é obrigatório' })
   @IsIn(['STUDENT', 'TEACHER'], { message: 'Tipo de perfil inválido' })
   profileType: 'STUDENT' | 'TEACHER';
+
+  @ApiProperty({
+    example: 'https://lh3.googleusercontent.com/...jpg',
+    description: 'URL do avatar do usuário',
+    required: false,
+  })
+  @IsOptional()
+  profileImageUrl?: string;
+
+  @IsOptional()
+  isGoogleUser?: boolean;
 }

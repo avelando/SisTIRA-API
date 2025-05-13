@@ -2,14 +2,15 @@ import { Controller, Post, Body, Get, Param, Put, Delete, UseGuards, Req, Forbid
 import { ExamsService } from './exams.service';
 import { CreateExamDto } from './dto/create.dto';
 import { UpdateExamDto } from './dto/update.dto';
-import { JwtAuthGuard } from 'src/modules/auth/jwt-auth.guard';
+import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Request } from 'express';
+import { CreateManualQuestionDto } from './dto/create-question.dto';
 
 @ApiTags('Provas')
 @Controller('exams')
 export class ExamsController {
-  constructor(private readonly examsService: ExamsService) {}
+  constructor(private readonly examsService: ExamsService) { }
 
   @UseGuards(JwtAuthGuard)
   @Post()
@@ -115,5 +116,15 @@ export class ExamsController {
   getResponses(@Req() req: Request, @Param('id') examId: string) {
     if (!req.user) throw new ForbiddenException('Usuário não autenticado');
     return this.examsService.getExamResponses((req.user as any).userId, examId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/manual-question')
+  async createManualQuestion(
+    @Req() req,
+    @Param('id') examId: string,
+    @Body() createManualQuestionDto: CreateManualQuestionDto,
+  ) {
+    return this.examsService.createQuestionAndAddToExam(req.user.id, examId, createManualQuestionDto);
   }
 }

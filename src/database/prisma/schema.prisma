@@ -18,16 +18,17 @@ enum UserRole {
 }
 
 model User {
-  id            String        @id @default(uuid())
-  username      String        @unique
-  email         String        @unique
-  password      String
-  firstName     String
-  lastName      String
+  id              String        @id @default(uuid())
+  username        String        @unique
+  email           String        @unique
+  password        String?
+  firstName       String
+  lastName        String
   profileImageUrl String?
-  profileType   UserRole      @default(STUDENT)
-  isAdmin       Boolean       @default(false)
-  createdAt     DateTime      @default(now())
+  profileType     UserRole      @default(STUDENT)
+  isAdmin         Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  isGoogleUser    Boolean       @default(false)
 
   questions     Question[]           @relation("UserQuestions")
   disciplines   Discipline[]         @relation("UserDisciplines")
@@ -69,7 +70,7 @@ model Discipline {
   name                    String
   creatorId               String
   creator                 User                       @relation("UserDisciplines", fields: [creatorId], references: [id], onDelete: Cascade)
-  questionDisciplines?    QuestionDiscipline[]      @relation("QuestionToDiscipline")
+  questionDisciplines     QuestionDiscipline[]       @relation("QuestionToDiscipline")
   questionBankDisciplines QuestionBankDiscipline[]   @relation("BankToDisciplines")
 }
 

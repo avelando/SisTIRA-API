@@ -1,4 +1,4 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateExamDto {
@@ -10,4 +10,18 @@ export class CreateExamDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @ApiProperty({ example: false, required: false, description: 'Se true, gera um código de acesso (e não link público).' })
+  @IsOptional()
+  @IsBoolean()
+  isPublic?: boolean;
+
+  @ApiProperty({ 
+    example: true, 
+    required: false, 
+    description: 'Se true, gera um código de acesso aleatório (em vez de usar o ID).' 
+  })
+  @IsOptional()
+  @IsBoolean()
+  generateAccessCode?: boolean;
 }

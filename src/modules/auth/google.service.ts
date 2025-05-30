@@ -1,5 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { GoogleProfile } from './interfaces/googleProps';
+import { GoogleProfile } from '../../interfaces/googleProps';
 import { CreateUserDto } from '../users/dto/create.dto';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
@@ -10,7 +10,7 @@ export class GoogleAuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
-  ) {}
+  ) { }
 
   async findOrCreate(profile: GoogleProfile): Promise<User> {
     const existing = await this.usersService.findByEmail(profile.email);

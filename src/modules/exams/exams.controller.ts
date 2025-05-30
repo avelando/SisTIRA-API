@@ -1,4 +1,16 @@
-import { Controller, Post, Body, Get, Param, Put, Delete, UseGuards, Req, ForbiddenException, Patch } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  Put,
+  Delete,
+  UseGuards,
+  Req,
+  ForbiddenException,
+  Patch,
+} from '@nestjs/common';
 import { ExamsService } from './exams.service';
 import { CreateExamDto } from './dto/create.dto';
 import { UpdateExamDto } from './dto/update.dto';
@@ -6,18 +18,40 @@ import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Request } from 'express';
 import { CreateManualQuestionDto } from './dto/create-question.dto';
+import { RespondExamDto } from './dto/create-response.dto';
+import { CorrectionService } from './correction.service';
 
 @ApiTags('Provas')
 @Controller('exams')
 export class ExamsController {
-  constructor(private readonly examsService: ExamsService) { }
+  constructor(
+    private readonly examsService: ExamsService,
+    private readonly correctionService: CorrectionService,
+  ) {}
+
+  @Get('health/gemini')
+  async healthGemini() {
+    return this.correctionService.testConnection();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('counts')
+  @ApiOperation({ summary: 'Total de provas, bancos e questões do usuário' })
+  async getCounts(@Req() req: Request) {
+    const userId = (req.user as any).userId;
+    return this.examsService.getCounts(userId);
+  }
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  @ApiOperation({ summary: 'Criar uma nova prova' })
+  @ApiOperation({
+    summary:
+      'Criar uma nova prova — marque isPublic para link público, ou marque generateAccessCode para gerar um código de acesso',
+  })
   create(@Req() req: Request, @Body() createExamDto: CreateExamDto) {
     if (!req.user) throw new ForbiddenException('Usuário não autenticado');
-    return this.examsService.create((req.user as any).userId, createExamDto);
+    const userId = (req.user as any).userId;
+    return this.examsService.create(userId, createExamDto);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -39,7 +73,11 @@ export class ExamsController {
   @UseGuards(JwtAuthGuard)
   @Put(':id')
   @ApiOperation({ summary: 'Atualizar uma prova' })
-  update(@Req() req: Request, @Param('id') id: string, @Body() updateExamDto: UpdateExamDto) {
+  update(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() updateExamDto: UpdateExamDto,
+  ) {
     if (!req.user) throw new ForbiddenException('Usuário não autenticado');
     return this.examsService.update((req.user as any).userId, id, updateExamDto);
   }
@@ -58,7 +96,7 @@ export class ExamsController {
   addQuestions(
     @Req() req: Request,
     @Param('id') id: string,
-    @Body() body: { questions: string[] }
+    @Body() body: { questions: string[] },
   ) {
     if (!req.user) throw new ForbiddenException('Usuário não autenticado');
     return this.examsService.addQuestions((req.user as any).userId, id, body.questions);
@@ -70,7 +108,7 @@ export class ExamsController {
   removeQuestions(
     @Req() req: Request,
     @Param('id') id: string,
-    @Body() body: { questions: string[] }
+    @Body() body: { questions: string[] },
   ) {
     if (!req.user) throw new ForbiddenException('Usuário não autenticado');
     return this.examsService.removeQuestions((req.user as any).userId, id, body.questions);
@@ -82,7 +120,7 @@ export class ExamsController {
   addBanks(
     @Req() req: Request,
     @Param('id') id: string,
-    @Body() body: { bankIds: string[] }
+    @Body() body: { bankIds: string[] },
   ) {
     if (!req.user) throw new ForbiddenException('Usuário não autenticado');
     return this.examsService.addBanks((req.user as any).userId, id, body.bankIds);
@@ -94,25 +132,32 @@ export class ExamsController {
   removeBanks(
     @Req() req: Request,
     @Param('id') id: string,
-    @Body() body: { bankIds: string[] }
+    @Body() body: { bankIds: string[] },
   ) {
     if (!req.user) throw new ForbiddenException('Usuário não autenticado');
     return this.examsService.removeBanks((req.user as any).userId, id, body.bankIds);
   }
 
+  @Get('respond/:identifier')
+  @ApiOperation({ summary: 'Obter prova para responder (público por código)' })
+  getForResponse(@Param('identifier') identifier: string) {
+    return this.examsService.getExamForResponse(identifier);
+  }
+
+  @Post('respond')
   @UseGuards(JwtAuthGuard)
-  @Post(':id/respond')
-  respondToExam(
+  @ApiOperation({ summary: 'Submeter respostas da prova (requer login)' })
+  respond(
     @Req() req: Request,
-    @Param('id') examId: string,
-    @Body() body: { answers: { questionId: string; alternativeId?: string; textResponse?: string }[] }
+    @Body() dto: RespondExamDto,
   ) {
-    if (!req.user) throw new ForbiddenException('Usuário não autenticado');
-    return this.examsService.respondToExam((req.user as any).userId, examId, body.answers);
+    const userId = (req.user as any).userId;
+    return this.examsService.respondToExam(userId, dto);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get(':id/responses')
+  @ApiOperation({ summary: 'Listar respostas enviadas' })
   getResponses(@Req() req: Request, @Param('id') examId: string) {
     if (!req.user) throw new ForbiddenException('Usuário não autenticado');
     return this.examsService.getExamResponses((req.user as any).userId, examId);
@@ -120,11 +165,16 @@ export class ExamsController {
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/manual-question')
-  async createManualQuestion(
-    @Req() req,
+  @ApiOperation({ summary: 'Criar questão manual dentro da prova' })
+  createManualQuestion(
+    @Req() req: Request,
     @Param('id') examId: string,
     @Body() createManualQuestionDto: CreateManualQuestionDto,
   ) {
-    return this.examsService.createQuestionAndAddToExam(req.user.id, examId, createManualQuestionDto);
+    return this.examsService.createQuestionAndAddToExam(
+      (req.user as any).userId,
+      examId,
+      createManualQuestionDto,
+    );
   }
 }

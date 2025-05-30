@@ -36,7 +36,6 @@ export class UsersService {
         password: hashedPassword,
         firstName: data.firstName.trim(),
         lastName: data.lastName.trim(),
-        profileType: data.profileType,
       },
     });
   }
@@ -78,7 +77,6 @@ export class UsersService {
     if (data.email) updatedData.email = data.email;
     if (data.firstName) updatedData.firstName = data.firstName;
     if (data.lastName) updatedData.lastName = data.lastName;
-    if (data.profileType) updatedData.profileType = data.profileType;
   
     if (data.profileImageUrl !== undefined) {
       updatedData.profileImageUrl = data.profileImageUrl;

@@ -35,6 +35,7 @@ model User {
   questionBanks QuestionBank[]       @relation("UserQuestionBanks")
   exams         Exam[]               @relation("UserExams")
   examResponses ExamResponse[]
+  examAccesses    ExamAccess[]
 }
 
 model SubjectiveModelAnswer {
@@ -143,6 +144,7 @@ model Exam {
   accessCode         String?            @unique
   isPublic           Boolean?           @default(false)
   createdAt          DateTime           @default(now())
+  examAccesses       ExamAccess[]
 }
 
 model ExamResponse {
@@ -190,4 +192,16 @@ model ExamQuestionBank {
   questionBank   QuestionBank @relation(fields: [questionBankId], references: [id], onDelete: Cascade)
 
   @@id([examId, questionBankId])
+}
+
+model ExamAccess {
+  id        String   @id @default(uuid())
+  userId    String
+  examId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, examId])
 }

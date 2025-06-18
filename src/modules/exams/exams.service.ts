@@ -493,4 +493,35 @@ export class ExamsService {
       })),
     };
   }
+
+  async grantAccess(userId: string, examId: string, code: string) {
+    const exam = await this.prisma.exam.findUnique({ where: { id: examId }});
+    if (!exam) throw new NotFoundException('Prova não encontrada');
+    if (exam.accessCode !== code) throw new ForbiddenException('Código inválido');
+
+    await this.prisma.examAccess.upsert({
+      where: { userId_examId: { userId, examId } },
+      create: { userId, examId },
+      update: {},
+    });
+
+    return this.getExamForResponseAuth(userId, examId);
+  }
+
+  async hasAccess(userId: string, examId: string): Promise<boolean> {
+    const exam = await this.prisma.exam.findUnique({ where: { id: examId } });
+    if (!exam) throw new NotFoundException('Prova não encontrada');
+    if (exam.isPublic) return true;
+
+    const access = await this.prisma.examAccess.findUnique({
+      where: { userId_examId: { userId, examId } }
+    });
+    return !!access;
+  }
+
+  async getExamForResponseAuth(userId: string, examId: string): Promise<ExamForResponse> {
+    const can = await this.hasAccess(userId, examId);
+    if (!can) throw new ForbiddenException('Acesso negado — digite o código');
+    return this.getExamForResponse(examId);
+  }
 }

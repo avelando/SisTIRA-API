@@ -10,6 +10,7 @@ import {
   Req,
   ForbiddenException,
   Patch,
+  NotFoundException,
 } from '@nestjs/common';
 import { ExamsService } from './exams.service';
 import { CreateExamDto } from './dto/create.dto';
@@ -20,6 +21,7 @@ import { Request } from 'express';
 import { CreateManualQuestionDto } from './dto/create-question.dto';
 import { RespondExamDto } from './dto/create-response.dto';
 import { CorrectionService } from './correction.service';
+import { ExamForResponse } from 'src/interfaces/examProps';
 
 @ApiTags('Provas')
 @Controller('exams')
@@ -176,5 +178,40 @@ export class ExamsController {
       examId,
       createManualQuestionDto,
     );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/grant-access')
+  @ApiOperation({ summary: 'Validar código e conceder acesso à prova' })
+  async grantAccess(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() body: { accessCode: string },
+  ) {
+    const userId = (req.user as any).userId;
+    return this.examsService.grantAccess(userId, id, body.accessCode);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':examId/respond-auth')
+  @ApiOperation({ summary: 'Obter prova para responder (autorizar acesso)' })
+  async getExamForResponseAuth(
+    @Req() req: Request,
+    @Param('examId') examId: string,
+  ): Promise<ExamForResponse> {
+    const userId = (req.user as any).userId;
+    return this.examsService.getExamForResponseAuth(userId, examId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/check-access')
+  @ApiOperation({ summary: 'Verificar se o usuário tem acesso à prova' })
+  async checkAccess(
+    @Req() req: Request,
+    @Param('id') id: string,
+  ) {
+    const userId = (req.user as any).userId;
+    const has = await this.examsService.hasAccess(userId, id);
+    return { hasAccess: has };
   }
 }

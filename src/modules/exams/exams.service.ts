@@ -85,6 +85,7 @@ export class ExamsService {
         description: true,
         creatorId: true,
         accessCode: true,
+        createdAt: true,
         questions: {
           select: {
             question: {
@@ -93,11 +94,11 @@ export class ExamsService {
                 text: true,
                 questionType: true,
                 alternatives: {
-                  select: { id: true, content: true, correct: true }
-                }
-              }
-            }
-          }
+                  select: { id: true, content: true, correct: true },
+                },
+              },
+            },
+          },
         },
         examQuestionBanks: {
           select: {
@@ -120,33 +121,35 @@ export class ExamsService {
                             id: true,
                             content: true,
                             correct: true,
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }        
-      }
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
-  
+
     if (!exam) throw new NotFoundException('Prova não encontrada');
     if (exam.creatorId !== userId) throw new ForbiddenException('Acesso negado');
-  
-    const manualQuestions = exam.questions.map(q => q.question);
-    const bankQuestions = exam.examQuestionBanks.flatMap(b => b.questionBank.questions.map(q => q.question));
-  
-    const allQuestionsMap = new Map();
-    [...manualQuestions, ...bankQuestions].forEach(q => {
-      allQuestionsMap.set(q.id, q);
-    });
-  
+
+    const manualQuestions = exam.questions.map((q) => q.question);
+    const bankQuestions = exam.examQuestionBanks.flatMap((b) =>
+      b.questionBank.questions.map((q) => q.question),
+    );
+
+    const allMap = new Map<string, typeof manualQuestions[0]>();
+    [...manualQuestions, ...bankQuestions].forEach((q) => allMap.set(q.id, q));
+    const allQuestions = Array.from(allMap.values());
+
     return {
       ...exam,
-      allQuestions: Array.from(allQuestionsMap.values()),
+      allQuestions,
+      questionCount: allQuestions.length,
     };
   }  
 
@@ -494,29 +497,40 @@ export class ExamsService {
     };
   }
 
-  async grantAccess(userId: string, examId: string, code: string) {
-    const exam = await this.prisma.exam.findUnique({ where: { id: examId }});
-    if (!exam) throw new NotFoundException('Prova não encontrada');
-    if (exam.accessCode !== code) throw new ForbiddenException('Código inválido');
+  async grantAccess(userId: string, examId: string, code: string): Promise<{ success: boolean }> {
+    const exam = await this.prisma.exam.findFirst({
+      where: { id: examId, accessCode: code },
+      select: { id: true }
+    });
+    if (!exam) {
+      throw new ForbiddenException('Código inválido ou prova não encontrada');
+    }
 
-    await this.prisma.examAccess.upsert({
-      where: { userId_examId: { userId, examId } },
-      create: { userId, examId },
-      update: {},
+    await this.prisma.examAccess.createMany({
+      data: [{ userId, examId }],
+      skipDuplicates: true,
     });
 
-    return this.getExamForResponseAuth(userId, examId);
+    return { success: true };
   }
 
   async hasAccess(userId: string, examId: string): Promise<boolean> {
-    const exam = await this.prisma.exam.findUnique({ where: { id: examId } });
-    if (!exam) throw new NotFoundException('Prova não encontrada');
-    if (exam.isPublic) return true;
+    const exam = await this.prisma.exam.findUnique({
+      where: { id: examId },
+      select: { isPublic: true }
+    });
+    if (!exam) {
+      throw new NotFoundException('Prova não encontrada');
+    }
+    if (exam.isPublic) {
+      return true;
+    }
 
     const access = await this.prisma.examAccess.findUnique({
-      where: { userId_examId: { userId, examId } }
+      where: { userId_examId: { userId, examId } },
+      select: { userId: true }
     });
-    return !!access;
+    return Boolean(access);
   }
 
   async getExamForResponseAuth(userId: string, examId: string): Promise<ExamForResponse> {

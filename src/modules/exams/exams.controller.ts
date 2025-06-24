@@ -181,37 +181,35 @@ export class ExamsController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Post(':id/grant-access')
-  @ApiOperation({ summary: 'Validar código e conceder acesso à prova' })
+  @Post(':id/access')
+  @ApiOperation({ summary: 'Validar código e registrar acesso à prova' })
   async grantAccess(
     @Req() req: Request,
-    @Param('id') id: string,
-    @Body() body: { accessCode: string },
+    @Param('id') examId: string,
+    @Body('accessCode') accessCode: string,
   ) {
     const userId = (req.user as any).userId;
-    return this.examsService.grantAccess(userId, id, body.accessCode);
+    await this.examsService.grantAccess(userId, examId, accessCode);
+    return { success: true };
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get(':examId/respond-auth')
+  @Get(':id/access')
+  @ApiOperation({ summary: 'Verificar se o usuário tem acesso à prova' })
+  async hasAccess(@Req() req: Request, @Param('id') examId: string) {
+    const userId = (req.user as any).userId;
+    const has = await this.examsService.hasAccess(userId, examId);
+    return { hasAccess: has };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/respond-auth')
   @ApiOperation({ summary: 'Obter prova para responder (autorizar acesso)' })
   async getExamForResponseAuth(
     @Req() req: Request,
-    @Param('examId') examId: string,
+    @Param('id') examId: string,
   ): Promise<ExamForResponse> {
     const userId = (req.user as any).userId;
     return this.examsService.getExamForResponseAuth(userId, examId);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Get(':id/check-access')
-  @ApiOperation({ summary: 'Verificar se o usuário tem acesso à prova' })
-  async checkAccess(
-    @Req() req: Request,
-    @Param('id') id: string,
-  ) {
-    const userId = (req.user as any).userId;
-    const has = await this.examsService.hasAccess(userId, id);
-    return { hasAccess: has };
   }
 }

@@ -1,5 +1,5 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { IsOptional, IsString, IsEmail } from 'class-validator';
+import { IsOptional, IsString, IsEmail, IsIn } from 'class-validator';
 
 export class UpdateUserDto {
   @ApiProperty({
@@ -46,4 +46,13 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   password?: string;
+
+  @IsOptional()
+  @IsIn(['STUDENT', 'TEACHER'], { message: 'Tipo de perfil inválido' })
+  @ApiProperty({ example: 'STUDENT', required: false, enum: ['STUDENT', 'TEACHER'] })
+  profileType?: 'STUDENT' | 'TEACHER';
+
+  @IsOptional()
+  @IsString()
+  profileImageUrl?: string;
 }

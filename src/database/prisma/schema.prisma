@@ -7,58 +7,87 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(uuid())
-  username  String   @unique
-  email     String   @unique
-  password  String
-  firstName String
-  lastName  String
-  isAdmin   Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  questions     Question[]     @relation("UserQuestions")
-  disciplines   Discipline[]   @relation("UserDisciplines")
-  questionBanks QuestionBank[] @relation("UserQuestionBanks")
-  exams         Exam[]         @relation("UserExams")
-}
-
 enum QuestionType {
   OBJ
   SUB
 }
 
+enum ModelAnswerType {
+  WRONG
+  MEDIAN
+  CORRECT
+}
+
+model User {
+  id              String        @id @default(uuid())
+  username        String        @unique
+  email           String        @unique
+  password        String?
+  firstName       String
+  lastName        String
+  profileImageUrl String?
+  isAdmin         Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  isGoogleUser    Boolean       @default(false)
+
+  questions     Question[]           @relation("UserQuestions")
+  disciplines   Discipline[]         @relation("UserDisciplines")
+  questionBanks QuestionBank[]       @relation("UserQuestionBanks")
+  exams         Exam[]               @relation("UserExams")
+  examResponses ExamResponse[]
+  examAccesses    ExamAccess[]
+}
+
+model SubjectiveModelAnswer {
+  id         String             @id @default(uuid())
+  questionId String
+  type       ModelAnswerType
+  content    String
+  createdAt  DateTime           @default(now())
+
+  question   Question           @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, type])
+}
+
 model Question {
-  id           String       @id @default(uuid())
-  text         String
-  questionType QuestionType
-  createdAt    DateTime     @default(now())
+  id                String                  @id @default(uuid())
+  text              String
+  questionType      QuestionType
+  createdAt         DateTime                @default(now())
+  educationLevel    String?
+  difficulty        String?
+  examReference     String?
 
-  creatorId String
-  creator   User   @relation("UserQuestions", fields: [creatorId], references: [id], onDelete: Cascade)
+  creatorId         String
+  creator           User                    @relation("UserQuestions", fields: [creatorId], references: [id], onDelete: Cascade)
 
-  alternatives        Alternative[]
-  questionDisciplines QuestionDiscipline[]   @relation("QuestionToDiscipline")
-  questionBanks       QuestionBankQuestion[] @relation("QuestionBankToQuestion")
-  exams               ExamQuestion[]         @relation("ExamToQuestion")
+  alternatives      Alternative[]
+  questionDisciplines QuestionDiscipline[]  @relation("QuestionToDiscipline")
+  questionBanks     QuestionBankQuestion[]  @relation("QuestionBankToQuestion")
+  exams             ExamQuestion[]          @relation("ExamToQuestion")
+  examAnswers       ExamAnswer[]
+
+  modelAnswers      SubjectiveModelAnswer[]
+  useModelAnswers   Boolean                 @default(false)
 }
 
 model Alternative {
-  id         String   @id @default(uuid())
+  id         String        @id @default(uuid())
   content    String
-  correct    Boolean  @default(false)
+  correct    Boolean       @default(false)
   questionId String
-  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  question   Question      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  examAnswers ExamAnswer[]
 }
 
 model Discipline {
-  id                  String               @id @default(uuid())
-  name                String
-  creatorId           String
-  creator             User                 @relation("UserDisciplines", fields: [creatorId], references: [id], onDelete: Cascade)
-  questionDisciplines QuestionDiscipline[] @relation("QuestionToDiscipline")
-
-  questionBankDisciplines QuestionBankDiscipline[] @relation("BankToDisciplines")
+  id                      String                     @id @default(uuid())
+  name                    String
+  creatorId               String
+  creator                 User                       @relation("UserDisciplines", fields: [creatorId], references: [id], onDelete: Cascade)
+  questionDisciplines     QuestionDiscipline[]       @relation("QuestionToDiscipline")
+  questionBankDisciplines QuestionBankDiscipline[]   @relation("BankToDisciplines")
 }
 
 model QuestionDiscipline {
@@ -71,15 +100,15 @@ model QuestionDiscipline {
 }
 
 model QuestionBank {
-  id                     String                  @id @default(uuid())
-  name                   String
-  description            String?
-  creatorId              String
-  creator                User                    @relation("UserQuestionBanks", fields: [creatorId], references: [id], onDelete: Cascade)
-  questions              QuestionBankQuestion[]  @relation("QuestionBankToQuestion")
+  id                      String                  @id @default(uuid())
+  name                    String
+  description             String?
+  creatorId               String
+  creator                 User                    @relation("UserQuestionBanks", fields: [creatorId], references: [id], onDelete: Cascade)
+  questions               QuestionBankQuestion[]  @relation("QuestionBankToQuestion")
   questionBankDisciplines QuestionBankDiscipline[] @relation("BankToDisciplines")
-  exams                  Exam[]                  @relation("ExamToQuestionBank")
-  createdAt              DateTime                @default(now())
+  examQuestionBanks       ExamQuestionBank[]
+  createdAt               DateTime                @default(now())
 }
 
 model QuestionBankQuestion {
@@ -92,10 +121,10 @@ model QuestionBankQuestion {
 }
 
 model QuestionBankDiscipline {
-  id             String       @id @default(uuid())
+  id             String   @id @default(uuid())
   questionBankId String
   disciplineId   String
-  isPredominant  Boolean      @default(false)
+  isPredominant  Boolean  @default(false)
 
   questionBank   QuestionBank @relation(fields: [questionBankId], references: [id], onDelete: Cascade, name: "BankToDisciplines")
   discipline     Discipline   @relation(fields: [disciplineId], references: [id], onDelete: Cascade, name: "BankToDisciplines")
@@ -104,15 +133,46 @@ model QuestionBankDiscipline {
 }
 
 model Exam {
-  id            String     @id @default(uuid())
-  name          String
-  description   String?
-  creatorId     String
-  creator       User       @relation("UserExams", fields: [creatorId], references: [id], onDelete: Cascade)
-  questions     ExamQuestion[] @relation("ExamToQuestion")
-  questionBankId String?
-  questionBank  QuestionBank? @relation(fields: [questionBankId], references: [id], onDelete: Cascade, name: "ExamToQuestionBank")
-  createdAt     DateTime   @default(now())
+  id                 String             @id @default(uuid())
+  title              String
+  description        String?
+  creatorId          String
+  creator            User               @relation("UserExams", fields: [creatorId], references: [id], onDelete: Cascade)
+  questions          ExamQuestion[]     @relation("ExamToQuestion")
+  examQuestionBanks  ExamQuestionBank[]
+  responses          ExamResponse[] 
+  accessCode         String?            @unique
+  isPublic           Boolean?           @default(false)
+  createdAt          DateTime           @default(now())
+  examAccesses       ExamAccess[]
+}
+
+model ExamResponse {
+  id        String       @id @default(uuid())
+  examId    String
+  exam      Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers   ExamAnswer[]
+  createdAt DateTime     @default(now())
+
+  @@unique([examId, userId])
+}
+
+model ExamAnswer {
+  id             String       @id @default(uuid())
+  responseId     String
+  questionId     String
+  alternativeId  String?
+  subjectiveText String? 
+  createdAt      DateTime     @default(now())
+
+  score          Float? 
+  feedback       String?
+
+  response       ExamResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  question       Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  alternative    Alternative? @relation(fields: [alternativeId], references: [id])
 }
 
 model ExamQuestion {
@@ -122,4 +182,26 @@ model ExamQuestion {
   question   Question  @relation(fields: [questionId], references: [id], onDelete: Cascade, name: "ExamToQuestion")
 
   @@id([examId, questionId])
+}
+
+model ExamQuestionBank {
+  examId         String
+  questionBankId String
+
+  exam           Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  questionBank   QuestionBank @relation(fields: [questionBankId], references: [id], onDelete: Cascade)
+
+  @@id([examId, questionBankId])
+}
+
+model ExamAccess {
+  id        String   @id @default(uuid())
+  userId    String
+  examId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, examId])
 }

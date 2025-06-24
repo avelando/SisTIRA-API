@@ -1,17 +1,33 @@
-import { 
-  Controller, Post, Body, Get, UseGuards, Patch, Delete, Req, UnauthorizedException 
+import {
+  Controller, Post, Body, Get, UseGuards, Patch, Delete, Req, UnauthorizedException,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+  HttpStatus
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create.dto';
 import { UpdateUserDto } from './dto/update.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
-import { JwtAuthGuard } from 'src/modules/auth/jwt-auth.guard';
+import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { Request } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { cloudinaryV2 } from 'src/config/cloudinary.config';
+import { Readable } from 'stream';
+
+function bufferToStream(buffer: Buffer): Readable {
+  const stream = new Readable();
+  stream.push(buffer);
+  stream.push(null);
+  return stream;
+}
 
 @ApiTags('Usuários')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+  ) { }
 
   @Post()
   @ApiOperation({ summary: 'Criar um novo usuário', description: 'Cria um novo usuário na plataforma.' })
@@ -36,37 +52,61 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Patch('me')
-  @ApiOperation({ 
-    summary: 'Atualizar parcialmente os dados do usuário autenticado', 
-    description: 'Permite atualizar apenas username, email, password, firstName e lastName. Os demais campos não podem ser alterados.' 
+  @ApiOperation({
+    summary: 'Atualizar os dados do usuário autenticado',
+    description: 'Atualiza nome, email, username e demais campos (exceto imagem).'
   })
   @ApiResponse({ status: 200, description: 'Usuário atualizado com sucesso.' })
   @ApiResponse({ status: 400, description: 'Erro nos dados enviados.' })
   @ApiResponse({ status: 401, description: 'Usuário não autenticado.' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        username: { type: 'string', example: 'NovoNome' },
-        email: { type: 'string', example: 'novoemail@example.com' },
-        firstName: { type: 'string', example: 'NovoPrimeiroNome' },
-        lastName: { type: 'string', example: 'NovoSobrenome' }
-      },
-    },
-  })
-  updateProfile(@Req() req: Request, @Body() updateUserDto: UpdateUserDto) {
+  @ApiBody({ type: UpdateUserDto })
+  async updateProfile(
+    @Req() req: Request,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
     if (!req.user) throw new UnauthorizedException('Usuário não autenticado');
     return this.usersService.updateUser(req.user.userId, updateUserDto);
   }
 
+  @Patch('me/profile-image')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @Delete('me')
-  @ApiOperation({ summary: 'Deletar a conta do usuário autenticado' })
-  @ApiResponse({ status: 200, description: 'Conta deletada com sucesso.' })
-  @ApiResponse({ status: 401, description: 'Usuário não autenticado.' })
-  deleteProfile(@Req() req: Request) {
+  @UseInterceptors(FileInterceptor('image'))
+  @ApiOperation({
+    summary: 'Atualizar a imagem de perfil do usuário autenticado',
+    description: 'Atualiza apenas a imagem de perfil via FormData.'
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Imagem atualizada com sucesso.' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Erro no upload da imagem.' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Usuário não autenticado.' })
+  async updateProfileImage(
+    @Req() req: Request,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
     if (!req.user) throw new UnauthorizedException('Usuário não autenticado');
-    return this.usersService.deleteUser(req.user.userId);
+    if (!file) throw new BadRequestException('Arquivo de imagem não enviado');
+
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinaryV2.uploader.upload_stream(
+        {
+          folder: 'profile_images',
+          upload_preset: process.env.CLOUDINARY_UPLOAD_PRESET,
+        },
+        async (error, result) => {
+          if (error || !result) {
+            console.error('Erro no upload do Cloudinary:', error);
+            return reject(new BadRequestException('Falha ao enviar imagem.'));
+          }
+
+          await this.usersService.updateUser(req.user!.userId, {
+            profileImageUrl: result!.secure_url,
+          });
+
+          resolve({ profileImageUrl: result!.secure_url });
+        },
+      );
+
+      bufferToStream(file.buffer).pipe(uploadStream);
+    });
   }
 }

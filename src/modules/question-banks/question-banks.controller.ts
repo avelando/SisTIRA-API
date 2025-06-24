@@ -1,17 +1,17 @@
-import { 
-  Controller, Get, Post, Body, Param, Delete, Put, Patch, UseGuards, Req, ForbiddenException 
+import {
+  Controller, Get, Post, Body, Param, Delete, Put, Patch, UseGuards, Req, ForbiddenException
 } from '@nestjs/common';
 import { QuestionBanksService } from './question-banks.service';
 import { CreateQuestionBankDto } from './dto/create.dto';
 import { UpdateQuestionBankDto } from './dto/update.dto';
-import { JwtAuthGuard } from 'src/modules/auth/jwt-auth.guard';
+import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Request } from 'express';
 
 @ApiTags('Bancos de Questões')
 @Controller('question-banks')
 export class QuestionBanksController {
-  constructor(private readonly questionBanksService: QuestionBanksService) {}
+  constructor(private readonly questionBanksService: QuestionBanksService) { }
 
   @UseGuards(JwtAuthGuard)
   @Post()
@@ -59,5 +59,17 @@ export class QuestionBanksController {
   remove(@Req() req: Request, @Param('id') id: string) {
     if (!req.user || !req.user.userId) throw new ForbiddenException('Usuário não autenticado');
     return this.questionBanksService.remove(req.user.userId, id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/remove-questions')
+  @ApiOperation({ summary: 'Remover questões do banco de questões' })
+  removeQuestions(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() body: { questions: string[] },
+  ) {
+    if (!req.user?.userId) throw new ForbiddenException('Usuário não autenticado');
+    return this.questionBanksService.removeQuestions(req.user.userId, id, body.questions);
   }
 }

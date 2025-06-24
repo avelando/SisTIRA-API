@@ -5,6 +5,7 @@ import { ValidationPipe } from '@nestjs/common';
 import * as cookieParser from 'cookie-parser';
 import { setupSwagger } from './config/swagger.config';
 import * as express from 'express';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
 
@@ -12,8 +13,17 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
+  const configService = app.get(ConfigService);
+  const port = configService.get<number>('PORT') || 3000;
+
   app.enableCors({
-    origin: ['http://localhost:3000', 'http://liara.picos.ifpi.edu.br', 'http://127.0.0.1:3000', 'http://10.1.15.9'],
+    origin: 
+      [
+        'http://localhost:3000', 
+        'http://127.0.0.1:3000', 
+        'http://liara.picos.ifpi.edu.br', 
+        'http://10.1.15.9'
+      ],
     credentials: true,
   });
 

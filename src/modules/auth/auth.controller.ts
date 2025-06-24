@@ -7,7 +7,7 @@ import { ApiTags } from '@nestjs/swagger';
 @ApiTags('Autenticação')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post('login')
   async login(@Body() loginDto: LoginDto, @Res() res: Response) {
@@ -21,9 +21,10 @@ export class AuthController {
 
     res.cookie('authToken', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'none',
-    });    
+      // secure: process.env.NODE_ENV === 'production',
+      secure: false,
+      sameSite: 'strict',
+    });
 
     return res.json({ message: 'Login realizado com sucesso!', user });
   }

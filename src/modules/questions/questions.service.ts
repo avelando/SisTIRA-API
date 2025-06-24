@@ -3,60 +3,81 @@ import { PrismaService } from 'src/database/prisma/prisma.service';
 import { CreateQuestionDto } from './dto/create.dto';
 import { UpdateQuestionDto } from './dto/update.dto';
 import { validate as isUUID } from 'uuid';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class QuestionsService {
   constructor(private prisma: PrismaService) {}
 
-  private async processDisciplines(userId: string, disciplines: string[]): Promise<{ disciplineId: string }[]> {
-    const processedDisciplines: { disciplineId: string }[] = [];
-
-    for (const discipline of disciplines) {
-      if (isUUID(discipline)) {
-        processedDisciplines.push({ disciplineId: discipline });
+  private async processDisciplines(
+    userId: string,
+    disciplines: string[],
+  ): Promise<{ disciplineId: string }[]> {
+    const processed: { disciplineId: string }[] = [];
+    for (const d of disciplines) {
+      if (isUUID(d)) {
+        processed.push({ disciplineId: d });
       } else {
-        let existingDiscipline = await this.prisma.discipline.findFirst({
-          where: { name: discipline, creatorId: userId },
+        let exist = await this.prisma.discipline.findFirst({
+          where: { name: d, creatorId: userId },
         });
-
-        if (!existingDiscipline) {
-          existingDiscipline = await this.prisma.discipline.create({
-            data: { name: discipline, creatorId: userId },
+        if (!exist) {
+          exist = await this.prisma.discipline.create({
+            data: { name: d, creatorId: userId },
           });
         }
-
-        processedDisciplines.push({ disciplineId: existingDiscipline.id });
+        processed.push({ disciplineId: exist.id });
       }
     }
-
-    return processedDisciplines;
+    return processed;
   }
 
   async create(userId: string, data: CreateQuestionDto) {
-    if (!data.disciplines || data.disciplines.length === 0) {
-      throw new ForbiddenException('Uma questão deve ter pelo menos uma disciplina associada.');
-    }
-
-    const disciplinesToConnect = await this.processDisciplines(userId, data.disciplines);
+    const discs = data.disciplines?.length
+      ? await this.processDisciplines(userId, data.disciplines)
+      : [];
 
     return this.prisma.question.create({
       data: {
         text: data.text,
         questionType: data.questionType,
         creatorId: userId,
-        questionDisciplines: {
-          create: disciplinesToConnect.map(d => ({
-            discipline: { connect: { id: d.disciplineId } }
-          }))
-        },
-        alternatives: data.questionType === 'SUB' ? undefined : { create: data.alternatives ?? [] },
+        educationLevel: data.educationLevel ?? null,
+        difficulty: data.difficulty ?? null,
+        examReference: data.examReference ?? null,
+        useModelAnswers: data.useModelAnswers ?? false,
+
+        questionDisciplines: discs.length
+          ? {
+              create: discs.map(d => ({
+                discipline: { connect: { id: d.disciplineId } },
+              })),
+            }
+          : undefined,
+
+        alternatives:
+          data.questionType === 'OBJ'
+            ? { create: data.alternatives ?? [] }
+            : undefined,
+
+        modelAnswers:
+          data.questionType === 'SUB' && data.useModelAnswers
+            ? { create: data.modelAnswers! }
+            : undefined,
       },
       select: {
         id: true,
         text: true,
         questionType: true,
-        questionDisciplines: { select: { discipline: { select: { id: true, name: true } } } },
-        alternatives: { select: { content: true, correct: true } },
+        educationLevel: true,
+        difficulty: true,
+        examReference: true,
+        useModelAnswers: true,
+        questionDisciplines: {
+          select: { discipline: { select: { id: true, name: true } } },
+        },
+        alternatives: { select: { id: true, content: true, correct: true } },
+        modelAnswers: { select: { id: true, type: true, content: true } },
       },
     });
   }
@@ -68,8 +89,15 @@ export class QuestionsService {
         id: true,
         text: true,
         questionType: true,
-        questionDisciplines: { select: { discipline: { select: { id: true, name: true } } } },
+        educationLevel: true,
+        difficulty: true,
+        examReference: true,
+        useModelAnswers: true,
+        questionDisciplines: {
+          select: { discipline: { select: { id: true, name: true } } },
+        },
         alternatives: { select: { content: true, correct: true } },
+        modelAnswers: { select: { id: true, type: true, content: true } },
       },
     });
   }
@@ -77,94 +105,110 @@ export class QuestionsService {
   async findOne(id: string) {
     const question = await this.prisma.question.findUnique({
       where: { id },
-      select: {
-        id: true,
-        text: true,
-        questionType: true,
-        questionDisciplines: { select: { discipline: { select: { id: true, name: true } } } },
-        alternatives: { select: { content: true, correct: true } },
+      include: {
+        questionDisciplines: {
+          select: { discipline: { select: { id: true, name: true } } },
+        },
+        alternatives: true,
+        modelAnswers: true,
       },
     });
-
     if (!question) throw new NotFoundException('Questão não encontrada');
-
     return question;
   }
 
   async update(userId: string, id: string, data: UpdateQuestionDto) {
-    const question = await this.prisma.question.findUnique({
+    const existing = await this.prisma.question.findUnique({
       where: { id },
-      include: { questionDisciplines: { include: { discipline: true } }, alternatives: true },
+      include: {
+        creator: true,
+        questionDisciplines: { include: { discipline: true } },
+        alternatives: true,
+        modelAnswers: true,
+      },
     });
+    if (!existing) throw new NotFoundException('Questão não encontrada');
+    if (existing.creatorId !== userId)
+      throw new ForbiddenException('Você só pode editar suas próprias questões');
 
-    if (!question) throw new NotFoundException('Questão não encontrada');
-    if (question.creatorId !== userId) throw new ForbiddenException('Você só pode editar suas próprias questões');
+    const discs = data.disciplines?.length
+      ? await this.processDisciplines(userId, data.disciplines)
+      : [];
+    const existingIds = existing.questionDisciplines.map(d => d.discipline.id);
+    const newIds = discs.map(d => d.disciplineId);
 
-    let disciplinesToConnect: { disciplineId: string }[] = [];
-    let disciplinesToDelete: { disciplineId: string }[] = [];
+    const createCon = discs
+      .filter(d => !existingIds.includes(d.disciplineId))
+      .map(d => ({ discipline: { connect: { id: d.disciplineId } } }));
+    const deleteCon = existingIds
+      .filter(dId => !newIds.includes(dId))
+      .map(disciplineId => ({ disciplineId }));
 
-    if (data.disciplines !== undefined) {
-      if (data.disciplines.length === 0) {
-        throw new ForbiddenException('Uma questão deve ter pelo menos uma disciplina associada.');
-      } else {
-        disciplinesToConnect = await this.processDisciplines(userId, data.disciplines);
-
-        const existingDisciplineIds = question.questionDisciplines.map(d => d.discipline.id);
-        const newDisciplineIds = disciplinesToConnect.map(d => d.disciplineId);
-
-        disciplinesToDelete = existingDisciplineIds
-          .filter(id => !newDisciplineIds.includes(id))
-          .map(id => ({ disciplineId: id }));
-      }
+    let altOps: Prisma.QuestionUpdateInput['alternatives'] | undefined;
+    if (data.questionType === 'OBJ') {
+      altOps = { deleteMany: {}, create: data.alternatives ?? [] };
+    } else if (existing.questionType === 'OBJ') {
+      altOps = { deleteMany: {} };
     }
 
-    const updatedQuestion = await this.prisma.question.update({
+    let maOps: Prisma.QuestionUpdateInput['modelAnswers'] | undefined;
+    if (data.questionType === 'SUB' && data.useModelAnswers) {
+      maOps = { deleteMany: {}, create: data.modelAnswers ?? [] };
+    } else if (data.useModelAnswers === false) {
+      maOps = { deleteMany: {} };
+    }
+
+    return this.prisma.question.update({
       where: { id },
       data: {
         text: data.text,
         questionType: data.questionType,
+        educationLevel: data.educationLevel ?? null,
+        difficulty: data.difficulty ?? null,
+        examReference: data.examReference ?? null,
+        useModelAnswers: data.useModelAnswers,
+
         questionDisciplines: {
-          deleteMany: disciplinesToDelete.length ? disciplinesToDelete : undefined,
-          create: disciplinesToConnect.length ? disciplinesToConnect.map(d => ({
-            discipline: { connect: { id: d.disciplineId } }
-          })) : undefined,
+          deleteMany: deleteCon.length ? deleteCon : undefined,
+          create: createCon.length ? createCon : undefined,
         },
-        alternatives: data.alternatives
-          ? { deleteMany: {}, create: data.alternatives }
-          : undefined,
+
+        alternatives: altOps,
+        modelAnswers: maOps,
       },
       select: {
         id: true,
         text: true,
         questionType: true,
-        questionDisciplines: { select: { discipline: { select: { id: true, name: true } } } },
+        educationLevel: true,
+        difficulty: true,
+        examReference: true,
+        useModelAnswers: true,
+        questionDisciplines: {
+          select: { discipline: { select: { id: true, name: true } } },
+        },
         alternatives: { select: { id: true, content: true, correct: true } },
+        modelAnswers: { select: { id: true, type: true, content: true } },
       },
     });
-
-    await this.removeUnusedDisciplines();
-
-    return updatedQuestion;
   }
 
   async remove(userId: string, id: string) {
     const question = await this.prisma.question.findUnique({ where: { id } });
-
     if (!question) throw new NotFoundException('Questão não encontrada');
-    if (question.creatorId !== userId) throw new ForbiddenException('Você só pode excluir suas próprias questões');
+    if (question.creatorId !== userId)
+      throw new ForbiddenException('Você só pode excluir suas próprias questões');
 
     await this.prisma.question.delete({ where: { id } });
-
     await this.removeUnusedDisciplines();
-
     return { message: 'Questão removida com sucesso' };
   }
 
   private async removeUnusedDisciplines() {
     await this.prisma.discipline.deleteMany({
       where: {
-        questionDisciplines: { none: {} }
-      }
+        questionDisciplines: { none: {} },
+      },
     });
   }
 }

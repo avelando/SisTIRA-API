@@ -50,10 +50,21 @@ export class ExamsController {
     summary:
       'Criar uma nova prova — marque isPublic para link público, ou marque generateAccessCode para gerar um código de acesso',
   })
-  create(@Req() req: Request, @Body() createExamDto: CreateExamDto) {
-    if (!req.user) throw new ForbiddenException('Usuário não autenticado');
+  async create(
+    @Req() req: Request,
+    @Body() createExamDto: CreateExamDto,
+  ) {
+    if (!req.user) {
+      throw new ForbiddenException('Usuário não autenticado');
+    }
     const userId = (req.user as any).userId;
-    return this.examsService.create(userId, createExamDto);
+
+    const exam = await this.examsService.create(userId, createExamDto);
+
+    return {
+      message: 'Nova prova criada com sucesso',
+      exam,
+    };
   }
 
   @UseGuards(JwtAuthGuard)

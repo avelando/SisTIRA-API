@@ -16,9 +16,17 @@ export class QuestionBanksController {
   @UseGuards(JwtAuthGuard)
   @Post()
   @ApiOperation({ summary: 'Criar um novo banco de questões' })
-  create(@Req() req: Request, @Body() createQuestionBankDto: CreateQuestionBankDto) {
-    if (!req.user || !req.user.userId) throw new ForbiddenException('Usuário não autenticado');
-    return this.questionBanksService.create(req.user.userId, createQuestionBankDto);
+  create(
+    @Req() req: Request,
+    @Body() createQuestionBankDto: CreateQuestionBankDto,
+  ) {
+    if (!req.user || !req.user.userId) {
+      throw new ForbiddenException('Usuário não autenticado');
+    }
+    return this.questionBanksService.create(
+      req.user.userId,
+      createQuestionBankDto,
+    );
   }
 
   @UseGuards(JwtAuthGuard)

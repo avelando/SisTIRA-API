@@ -39,7 +39,10 @@ export class QuestionsController {
     @Req() req: Request,
     @Body() createQuestionDto: CreateQuestionDto,
   ) {
-    return this.questionsService.create(req.user!.userId, createQuestionDto);
+    return this.questionsService.create(
+      req.user!.userId,
+      createQuestionDto,
+    );
   }
 
   @UseGuards(JwtAuthGuard)

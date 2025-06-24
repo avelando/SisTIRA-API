@@ -5,6 +5,8 @@ import { UpdateQuestionDto } from './dto/update.dto';
 import { validate as isUUID } from 'uuid';
 import { Prisma } from '@prisma/client';
 
+import { NotificationType } from '@prisma/client';
+
 @Injectable()
 export class QuestionsService {
   constructor(private prisma: PrismaService) {}
@@ -37,7 +39,7 @@ export class QuestionsService {
       ? await this.processDisciplines(userId, data.disciplines)
       : [];
 
-    return this.prisma.question.create({
+    const question = await this.prisma.question.create({
       data: {
         text: data.text,
         questionType: data.questionType,
@@ -80,6 +82,17 @@ export class QuestionsService {
         modelAnswers: { select: { id: true, type: true, content: true } },
       },
     });
+
+    await this.prisma.notification.create({
+      data: {
+        userId,
+        type: NotificationType.QUESTION_CREATED,
+        entityId: question.id,
+        message: `Nova questão criada: "${question.text.slice(0, 50)}…"`,
+      },
+    });
+
+    return question;
   }
 
   async findAll(userId: string) {

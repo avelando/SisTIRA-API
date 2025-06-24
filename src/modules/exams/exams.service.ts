@@ -8,6 +8,8 @@ import { RespondExamDto } from './dto/create-response.dto';
 import { customAlphabet } from 'nanoid';
 import { ExamForResponse } from 'src/interfaces/examProps';
 
+import { NotificationType } from '@prisma/client';
+
 const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', 8);
 
 @Injectable()
@@ -17,10 +19,10 @@ export class ExamsService {
   async create(userId: string, data: CreateExamDto) {
     let accessCode: string | undefined;
     if (!data.isPublic && data.generateAccessCode) {
-      accessCode = nanoid(); 
+      accessCode = nanoid();
     }
 
-    return this.prisma.exam.create({
+    const exam = await this.prisma.exam.create({
       data: {
         title: data.title,
         description: data.description,
@@ -56,6 +58,17 @@ export class ExamsService {
         },
       },
     });
+
+    await this.prisma.notification.create({
+      data: {
+        userId,
+        type: NotificationType.EXAM_CREATED,
+        entityId: exam.id,
+        message: `Nova prova criada: "${exam.title}"`,
+      },
+    });
+
+    return exam;
   }
 
   async findAll(userId: string) {

@@ -3,6 +3,8 @@ import { PrismaService } from 'src/database/prisma/prisma.service';
 import { CreateQuestionBankDto } from './dto/create.dto';
 import { UpdateQuestionBankDto } from './dto/update.dto';
 
+import { NotificationType } from '@prisma/client';
+
 @Injectable()
 export class QuestionBanksService {
   constructor(private prisma: PrismaService) {}
@@ -45,7 +47,6 @@ export class QuestionBanksService {
       where: { id: { in: data.questions || [] }, creatorId: userId },
       select: { id: true },
     });
-
     if (userQuestions.length !== (data.questions || []).length) {
       throw new ForbiddenException('Você só pode adicionar questões criadas por você mesmo.');
     }
@@ -55,7 +56,18 @@ export class QuestionBanksService {
         name: data.name,
         description: data.description,
         creatorId: userId,
-        questions: { create: data.questions?.map((id) => ({ questionId: id })) || [] },
+        questions: {
+          create: data.questions?.map((id) => ({ questionId: id })) || [],
+        },
+      },
+    });
+
+    await this.prisma.notification.create({
+      data: {
+        userId,
+        type: NotificationType.QUESTION_BANK_CREATED,
+        entityId: questionBank.id,
+        message: `Novo banco de questões criado: ${questionBank.name}`,
       },
     });
 

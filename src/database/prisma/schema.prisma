@@ -36,6 +36,8 @@ model User {
   exams         Exam[]               @relation("UserExams")
   examResponses ExamResponse[]
   examAccesses    ExamAccess[]
+
+  notifications   Notification[]
 }
 
 model SubjectiveModelAnswer {
@@ -204,4 +206,20 @@ model ExamAccess {
   exam Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
 
   @@unique([userId, examId])
+}
+
+enum NotificationType {
+  EXAM_CREATED
+  QUESTION_CREATED
+  QUESTION_BANK_CREATED
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  userId      String
+  type        NotificationType
+  entityId    String
+  message     String
+  createdAt   DateTime         @default(now())
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
